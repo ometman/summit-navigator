@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { useAuth } from '@/firebase/provider';
+import { useRouter } from 'next/navigation';
 
 export interface UserAuthResult {
   user: User | null;
@@ -15,9 +16,10 @@ export interface UserAuthResult {
  */
 export function useUser(): UserAuthResult {
   const auth = useAuth();
+  const router = useRouter();
   const [state, setState] = useState<UserAuthResult>({
     user: auth.currentUser,
-    isUserLoading: auth.currentUser ? false : true,
+    isUserLoading: !auth.currentUser,
     userError: null,
   });
 
