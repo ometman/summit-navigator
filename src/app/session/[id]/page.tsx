@@ -7,12 +7,14 @@ import GenericContent from "@/components/session/content/generic";
 import Session2Content from "@/components/session/content/session-2";
 import Session3Content from "@/components/session/content/session-3";
 import Session4Content from "@/components/session/content/session-4";
+import Session5Content from "@/components/session/content/session-5";
 import Session6Content from "@/components/session/content/session-6";
 
 const contentComponents: { [key: number]: React.FC<{ session: Session }> } = {
   2: Session2Content,
   3: Session3Content,
   4: Session4Content,
+  5: Session5Content,
   6: Session6Content,
 };
 
