@@ -1,26 +1,9 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
+    // Allow authenticated users to read and write to the questions subcollection
     match /sessions/{sessionId}/questions/{questionId} {
-      // Authenticated users can read/list questions
-      allow read: if isAuthenticated();
-
-      // Authenticated users can create questions
-      allow create: if isAuthenticated() && isOwner(request.resource.data.authorId);
-
-      // Only the owner can update (e.g., upvote logic will need adjustment) or delete
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.authorId);
+      allow read, write: if request.auth != null;
     }
   }
 }
