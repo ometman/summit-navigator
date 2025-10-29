@@ -4,7 +4,6 @@ import { useState } from 'react';
 import {
   useFirestore,
   useUser,
-  useCollection,
   useMemoFirebase,
 } from '@/firebase';
 import {
@@ -52,21 +51,17 @@ export function QandA({ sessionId }: { sessionId: string }) {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
+  // Temporarily disable question fetching
+  const questions: Question[] | null = [];
+  const isLoadingQuestions = false;
+  const questionsError = null;
+
+
   const questionsRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'sessions', sessionId, 'questions');
   }, [firestore, sessionId]);
 
-  const questionsQuery = useMemoFirebase(() => {
-    if (!questionsRef) return null;
-    return query(questionsRef, orderBy('upvotes', 'desc'), orderBy('timestamp', 'desc'));
-  }, [questionsRef]);
-
-  const {
-    data: questions,
-    isLoading: isLoadingQuestions,
-    error: questionsError,
-  } = useCollection<Question>(questionsQuery);
 
   const handleQuestionSubmit = async () => {
     if (!newQuestion.trim() || !user || !firestore || !questionsRef) {
@@ -189,60 +184,10 @@ export function QandA({ sessionId }: { sessionId: string }) {
           </Alert>
         )}
 
-        {isComponentLoading ? (
-            <div className="flex items-center justify-center h-24">
-                <Loader2 className="animate-spin text-primary" />
-            </div>
-        ) : questionsError ? (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error Loading Questions</AlertTitle>
-                <AlertDescription>
-                There was a problem fetching the Q&amp;A. This is likely a permissions issue. The security rules may need to be updated.
-                </AlertDescription>
-            </Alert>
-        ) : (
-            <div className="space-y-4">
-            {questions && questions.length > 0 ? (
-                questions.map((q) => (
-                <div
-                    key={q.id}
-                    className="flex items-start gap-4 p-4 bg-card rounded-lg shadow-sm border"
-                >
-                    <div className="flex flex-col items-center gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleUpvote(q.id)}
-                        disabled={!user || q.upvotedBy?.includes(user.uid)}
-                        className="group"
-                    >
-                        <ThumbsUp className={`h-5 w-5 ${q.upvotedBy?.includes(user?.uid || '') ? 'text-primary fill-primary/20' : 'text-slate-500 group-hover:text-primary'}`} />
-                    </Button>
-                    <span className="font-bold text-sm text-primary">{q.upvotes}</span>
-                    </div>
-                    <div className="flex-1">
-                    <p className="text-foreground">{q.text}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                        <User className="h-3 w-3" />
-                        <span>{q.author}</span>
-                        {q.timestamp?.toDate && (
-                            <span>
-                                {new Date(q.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                        )}
-                    </div>
-                    </div>
-                </div>
-                ))
-            ) : (
-                <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
-                <p className="text-muted-foreground font-medium">No questions yet.</p>
-                <p className="text-sm text-muted-foreground/80">Be the first to ask something!</p>
-                </div>
-            )}
-            </div>
-        )}
+        <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
+            <p className="text-muted-foreground font-medium">Q&A is temporarily disabled.</p>
+            <p className="text-sm text-muted-foreground/80">We are working on resolving a permissions issue.</p>
+        </div>
       </CardContent>
     </Card>
   );
