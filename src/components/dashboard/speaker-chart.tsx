@@ -1,16 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { Bar, BarChart, XAxis, YAxis } from "recharts"
-
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { agendaData } from "@/lib/data"
 
-// Utility function to wrap long chart labels
 function wrapLabel(label: string) {
     if (label.length <= 16) {
         return label;
@@ -39,8 +33,14 @@ const getSpeakerData = () => {
         speakerMins[session.speaker] = (speakerMins[session.speaker] || 0) + totalMinutes;
     });
 
+    const chartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+
     return Object.entries(speakerMins)
-        .map(([speaker, minutes]) => ({ speaker, minutes }))
+        .map(([speaker, minutes], index) => ({ 
+            speaker, 
+            minutes,
+            fill: chartColors[index % chartColors.length] 
+        }))
         .sort((a, b) => a.minutes - b.minutes);
 };
 
@@ -49,9 +49,15 @@ const chartData = getSpeakerData();
 const chartConfig = {
   minutes: {
     label: "Minutes",
-    color: "hsl(var(--chart-1))",
   },
-}
+};
+
+chartData.forEach((data, index) => {
+    chartConfig[data.speaker] = {
+        label: data.speaker,
+        color: `hsl(var(--chart-${(index % 5) + 1}))`,
+    };
+});
 
 export function SpeakerChart() {
   return (
@@ -60,7 +66,7 @@ export function SpeakerChart() {
         accessibilityLayer
         data={chartData}
         layout="vertical"
-        margin={{ left: 10, right: 10 }}
+        margin={{ left: 10, right: 10, top: 10, bottom: 10 }}
       >
         <YAxis
           dataKey="speaker"
@@ -75,11 +81,12 @@ export function SpeakerChart() {
           className="text-muted-foreground"
         />
         <XAxis dataKey="minutes" type="number" hide />
+        <CartesianGrid horizontal={false} />
         <ChartTooltip
           cursor={false}
-          content={<ChartTooltipContent labelKey="minutes" />}
+          content={<ChartTooltipContent indicator="dot" />}
         />
-        <Bar dataKey="minutes" layout="vertical" radius={5} fill="var(--color-minutes)" />
+        <Bar dataKey="minutes" layout="vertical" radius={5} />
       </BarChart>
     </ChartContainer>
   )
