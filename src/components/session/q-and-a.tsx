@@ -60,7 +60,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
   const questionsQuery = useMemoFirebase(
     () => {
       if (!questionsRef) return null;
-      return query(questionsRef, orderBy('upvotes', 'desc'));
+      return query(questionsRef, orderBy('upvotes', 'desc'), orderBy('timestamp', 'desc'));
     },
     [questionsRef]
   );
@@ -92,6 +92,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
         setNewQuestion('');
       })
       .catch((e: any) => {
+        console.error("Submission error:", e);
         setLocalError('Failed to submit your question. Please try again.');
       })
       .finally(() => {
@@ -110,6 +111,9 @@ export function QandA({ sessionId }: { sessionId: string }) {
     updateDocumentNonBlocking(questionRef, {
       upvotes: increment(1),
       upvotedBy: arrayUnion(user.uid),
+    }).catch(e => {
+        console.error("Upvote error:", e);
+        // Optionally show an error to the user that upvote failed
     });
   };
 
@@ -130,7 +134,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
         <div className="flex gap-2 mb-6">
           <Input
             type="text"
-            placeholder="Type your question here..."
+            placeholder={user ? "Type your question here..." : "Loading..."}
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
             disabled={isSubmitting || !user}
@@ -193,9 +197,11 @@ export function QandA({ sessionId }: { sessionId: string }) {
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                         <User className="h-3 w-3" />
                         <span>{q.author}</span>
-                        <span>
-                        {q.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        {q.timestamp?.toDate && (
+                            <span>
+                                {q.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
                     </div>
                     </div>
                 </div>
