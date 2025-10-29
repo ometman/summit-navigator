@@ -156,7 +156,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
           </Alert>
         )}
 
-        {isComponentLoading ? (
+        {isComponentLoading && !questions ? (
             <div className="flex items-center justify-center h-24">
                 <Loader2 className="animate-spin text-primary" />
             </div>
