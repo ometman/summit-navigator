@@ -12,7 +12,7 @@ export default function HomePage() {
           <div className="container px-4 md:px-6">
             <div className="max-w-3xl mx-auto">
               <h2 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tighter mb-4">
-                Welcome to the Leadership Summit Navigator
+                Welcome to the Summit Navigator
               </h2>
               <p className="text-xl text-muted-foreground mb-8">
                 Your interactive guide to the premier leadership training event of the year.
