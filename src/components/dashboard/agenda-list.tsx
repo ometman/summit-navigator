@@ -16,6 +16,7 @@ function SessionItem({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const speakerUrl = `/speaker/${session.speaker.replace(/\s/g, "+")}`;
   return (
     <div
       id={`session-${session.id}`}
@@ -29,7 +30,12 @@ function SessionItem({
         <div>
           <p className="text-sm font-mono text-muted-foreground">{session.time}</p>
           <p className="text-lg font-semibold text-foreground">{session.title}</p>
-          <p className="text-sm text-muted-foreground">Speaker: {session.speaker}</p>
+          <p className="text-sm text-muted-foreground">
+            Speaker:{" "}
+            <Link href={speakerUrl} className="font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                {session.speaker}
+            </Link>
+          </p>
         </div>
         <Button
           asChild

@@ -10,6 +10,38 @@ export interface Session {
   summary: string;
 }
 
+export interface Speaker {
+    name: string;
+    role: string;
+    bio: string;
+    imageUrl: string;
+    imageHint: string;
+}
+
+export const speakerData: Speaker[] = [
+    {
+        name: 'Bishop Davis Freeman',
+        role: 'Visionary & Leadership Expert',
+        bio: 'With over 30 years in ministry, Bishop Davis Freeman is a renowned voice on church planting and global leadership. His apostolic calling has led him to establish thriving ministries across three continents, and he specializes in casting vision that mobilizes generations for Christ.',
+        imageUrl: 'https://picsum.photos/seed/speaker1/600/400',
+        imageHint: 'man portrait',
+    },
+    {
+        name: 'Omet Omeni',
+        role: 'Church Operations & Strategy Consultant',
+        bio: 'Omet Omeni is a leading expert in church governance and strategic planning. A certified project manager and theologian, he helps ministries build scalable systems and policies that foster sustainable growth, accountability, and operational excellence. He has consulted for over 50 growing churches.',
+        imageUrl: 'https://picsum.photos/seed/speaker2/600/400',
+        imageHint: 'man portrait',
+    },
+    {
+        name: 'Dr. Richard Yeboah',
+        role: 'Theologian & Stewardship Scholar',
+        bio: 'Dr. Richard Yeboah is a respected theologian and author whose work focuses on Biblical economics and the theology of stewardship. As a seminary professor and advisor to non-profits, he provides profound insights on integrity, financial management, and leadership ethics.',
+        imageUrl: 'https://picsum.photos/seed/speaker3/600/400',
+        imageHint: 'man portrait',
+    }
+];
+
 export const agendaData: Session[] = [
     { 
         id: 1, 

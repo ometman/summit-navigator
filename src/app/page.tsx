@@ -3,6 +3,7 @@ import { AgendaList } from "@/components/dashboard/agenda-list";
 import { CompositionChart } from "@/components/dashboard/composition-chart";
 import { SpeakerChart } from "@/components/dashboard/speaker-chart";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { SpeakerGrid } from "@/components/dashboard/speaker-grid";
 
 export default function Home() {
   return (
@@ -25,6 +26,15 @@ export default function Home() {
         </div>
 
         <div className="lg:col-span-1 space-y-8">
+          <Card className="shadow-xl">
+            <CardHeader>
+                <CardTitle className="text-xl font-bold text-foreground mb-2 border-b pb-2">Expert Speakers</CardTitle>
+                <CardDescription>Click a speaker to view their profile and sessions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <SpeakerGrid />
+            </CardContent>
+          </Card>
           <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="text-xl font-bold text-foreground mb-2 border-b pb-2">Total Program Composition</CardTitle>
