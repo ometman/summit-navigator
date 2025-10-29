@@ -5,6 +5,7 @@ import {
   useFirestore,
   useUser,
   useMemoFirebase,
+  useCollection,
 } from '@/firebase';
 import {
   addDoc,
@@ -32,6 +33,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Question {
   id: string;
@@ -51,17 +53,17 @@ export function QandA({ sessionId }: { sessionId: string }) {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  // Temporarily disable question fetching
-  const questions: Question[] | null = [];
-  const isLoadingQuestions = false;
-  const questionsError = null;
-
-
   const questionsRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'sessions', sessionId, 'questions');
   }, [firestore, sessionId]);
+  
+  const questionsQuery = useMemoFirebase(() => {
+    if (!questionsRef) return null;
+    return query(questionsRef, orderBy('upvotes', 'desc'), orderBy('timestamp', 'desc'));
+  }, [questionsRef]);
 
+  const { data: questions, isLoading: isLoadingQuestions, error: questionsError } = useCollection<Question>(questionsQuery);
 
   const handleQuestionSubmit = async () => {
     if (!newQuestion.trim() || !user || !firestore || !questionsRef) {
@@ -176,17 +178,51 @@ export function QandA({ sessionId }: { sessionId: string }) {
           </div>
         </div>
 
-        {localError && (
+        {(localError || questionsError) && (
           <Alert variant="destructive" className="mb-4">
              <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Submission Failed</AlertTitle>
-            <AlertDescription>{localError}</AlertDescription>
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{localError || 'Could not load questions.'}</AlertDescription>
           </Alert>
         )}
 
-        <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
-            <p className="text-muted-foreground font-medium">Q&A is temporarily disabled.</p>
-            <p className="text-sm text-muted-foreground/80">We are working on resolving a permissions issue.</p>
+        <div className="space-y-4">
+          {isComponentLoading ? (
+             <div className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+             </div>
+          ) : questions && questions.length > 0 ? (
+            questions.map((question) => (
+              <div key={question.id} className="flex items-start gap-4 p-4 rounded-lg bg-background/60 border">
+                <div className="flex flex-col items-center">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleUpvote(question.id)}
+                        disabled={!user || question.upvotedBy.includes(user.uid)}
+                        className="flex flex-col h-auto px-2 py-1 text-primary disabled:text-muted-foreground hover:text-primary/80"
+                    >
+                        <ThumbsUp className="h-5 w-5" />
+                        <span className="font-bold text-sm">{question.upvotes}</span>
+                    </Button>
+                </div>
+                <div className="flex-1">
+                  <p className="text-foreground">{question.text}</p>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <User className="h-3 w-3" />
+                    <span>{question.author}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
+                <p className="text-muted-foreground font-medium">No questions yet.</p>
+                <p className="text-sm text-muted-foreground/80">Be the first to ask something!</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

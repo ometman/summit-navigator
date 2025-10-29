@@ -1,69 +1,26 @@
-/**
- * @fileoverview Firestore Security Rules for the leadership seminar application.
- *
- * Core Philosophy:
- * This ruleset allows public read access to all data (sessions and speakers).
- * Write access is completely denied, effectively making the database read-only.
- *
- * Data Structure:
- * The database consists of two top-level collections: `/sessions/{sessionId}` and `/speakers/{speakerId}`.
- * There are no subcollections and no user-specific data.
- *
- * Key Security Decisions:
- * - Public Read Access: All sessions and speaker information is publicly readable without authentication.
- * - No Write Access: No create, update, or delete operations are permitted, even for authenticated users.
- * - No User-Specific Data: The application does not store or manage any user-specific information, so there is no concept of ownership or private data.
- *
- * Denormalization for Authorization: N/A - No authorization checks are needed since all reads are public and all writes are denied.
- * Structural Segregation: N/A - All data is public, so there is no need to segregate private and public data.
- */
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Grants public read access to all sessions.  No write access is allowed.
-     * @path /sessions/{sessionId}
-     * @allow (get, list): Any user can read session data.
-     * @deny (create, update, delete): No user can create, update, or delete session data.
-     * @principle Allows public read access, denies all writes.
-     */
-    match /sessions/{sessionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    /**
-     * @description Grants public read access to all speakers. No write access is allowed.
-     * @path /speakers/{speakerId}
-     * @allow (get, list): Any user can read speaker data.
-     * @deny (create, update, delete): No user can create, update, or delete speaker data.
-     * @principle Allows public read access, denies all writes.
-     */
-    match /speakers/{speakerId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
-    
-    /**
-     * @description Denies read access to questions subcollection.
-     * @path /sessions/{sessionId}/questions
-     * @deny (get, list): No user can read questions data.
-     * @deny (create, update, delete): No user can create, update, or delete questions data.
-     * @principle Denies all access.
-     */
+
     match /sessions/{sessionId}/questions/{questionId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      // Authenticated users can read/list questions
+      allow read: if isAuthenticated();
+
+      // Authenticated users can create questions
+      allow create: if isAuthenticated() && isOwner(request.resource.data.authorId);
+
+      // Only the owner can update (e.g., upvote logic will need adjustment) or delete
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.authorId);
     }
   }
 }

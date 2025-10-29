@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { useAuth } from '@/firebase/provider';
-import { useRouter } from 'next/navigation';
 
 export interface UserAuthResult {
   user: User | null;
@@ -16,14 +15,22 @@ export interface UserAuthResult {
  */
 export function useUser(): UserAuthResult {
   const auth = useAuth();
-  const router = useRouter();
-  const [state, setState] = useState<UserAuthResult>({
-    user: auth.currentUser,
-    isUserLoading: !auth.currentUser,
-    userError: null,
+  const [state, setState] = useState<UserAuthResult>(() => {
+    // Initialize state synchronously to avoid flash of unauthenticated content
+    const user = auth?.currentUser;
+    return {
+      user: user || null,
+      isUserLoading: !user,
+      userError: null
+    };
   });
 
   useEffect(() => {
+    if (!auth) {
+        setState({ user: null, isUserLoading: false, userError: new Error("Auth service not available.") });
+        return;
+    }
+
     const unsubscribe = onAuthStateChanged(
       auth,
       async (user) => {
