@@ -1,0 +1,320 @@
+{
+  "entities": {
+    "Question": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Question",
+      "type": "object",
+      "description": "Represents a question submitted by an attendee for a specific session.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the question."
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Reference to Session. (Relationship: Session 1:N Question) The ID of the session this question belongs to."
+        },
+        "attendeeId": {
+          "type": "string",
+          "description": "Reference to Attendee. (Relationship: Attendee 1:N Question) The ID of the attendee who submitted the question."
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content of the question."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The date and time the question was submitted.",
+          "format": "date-time"
+        },
+        "isAnswered": {
+          "type": "boolean",
+          "description": "Indicates whether the question has been answered."
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "attendeeId",
+        "text",
+        "timestamp",
+        "isAnswered"
+      ]
+    },
+    "Poll": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Poll",
+      "type": "object",
+      "description": "Represents a live poll created for a specific session.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the poll."
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Reference to Session. (Relationship: Session 1:N Poll) The ID of the session this poll belongs to."
+        },
+        "questionText": {
+          "type": "string",
+          "description": "The text of the poll question."
+        },
+        "options": {
+          "type": "array",
+          "description": "An array of possible answer options for the poll.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startTime": {
+          "type": "string",
+          "description": "The date and time the poll started.",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "The date and time the poll ended.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "questionText",
+        "options",
+        "startTime",
+        "endTime"
+      ]
+    },
+    "PollResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PollResponse",
+      "type": "object",
+      "description": "Represents a single response to a poll from an attendee.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the poll response."
+        },
+        "pollId": {
+          "type": "string",
+          "description": "Reference to Poll. (Relationship: Poll 1:N PollResponse) The ID of the poll this response belongs to."
+        },
+        "attendeeId": {
+          "type": "string",
+          "description": "Reference to Attendee. (Relationship: Attendee 1:N PollResponse) The ID of the attendee who submitted the response."
+        },
+        "selectedOption": {
+          "type": "string",
+          "description": "The text of the option selected by the attendee."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The date and time the response was submitted.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "pollId",
+        "attendeeId",
+        "selectedOption",
+        "timestamp"
+      ]
+    },
+    "Session": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Session",
+      "type": "object",
+      "description": "Represents a session in the leadership summit agenda.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the session."
+        },
+        "time": {
+          "type": "string",
+          "description": "The time slot of the session (e.g., '9:00 AM - 10:00 AM')."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the session."
+        },
+        "speaker": {
+          "type": "string",
+          "description": "The name of the speaker for the session."
+        },
+        "content": {
+          "type": "number",
+          "description": "The duration of the content portion of the session in minutes."
+        },
+        "qa": {
+          "type": "number",
+          "description": "The duration of the Q&A portion of the session in minutes."
+        },
+        "prayer": {
+          "type": "number",
+          "description": "The duration of the prayer portion of the session in minutes."
+        },
+        "afternoon": {
+          "type": "boolean",
+          "description": "Indicates whether the session takes place in the afternoon."
+        },
+        "summary": {
+          "type": "string",
+          "description": "A brief summary of the session content."
+        }
+      },
+      "required": [
+        "id",
+        "time",
+        "title",
+        "speaker",
+        "content",
+        "qa",
+        "prayer",
+        "afternoon",
+        "summary"
+      ]
+    },
+    "Attendee": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Attendee",
+      "type": "object",
+      "description": "Represents an attendee of the leadership summit.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the attendee."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the attendee."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the attendee."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the attendee.",
+          "format": "email"
+        },
+        "affiliation": {
+          "type": "string",
+          "description": "The organization or group the attendee is affiliated with."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "affiliation"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "sessions/{sessionId}",
+        "definition": {
+          "entityName": "Session",
+          "schema": {
+            "$ref": "#/backend/entities/Session"
+          },
+          "description": "Stores session details. Serves as the parent for questions and polls subcollections.",
+          "params": [
+            {
+              "name": "sessionId",
+              "description": "The unique identifier for the session."
+            }
+          ]
+        }
+      },
+      {
+        "path": "sessions/{sessionId}/questions/{questionId}",
+        "definition": {
+          "entityName": "Question",
+          "schema": {
+            "$ref": "#/backend/entities/Question"
+          },
+          "description": "Stores questions submitted for a specific session. Includes denormalized 'sessionId' and 'attendeeId' for authorization independence.",
+          "params": [
+            {
+              "name": "sessionId",
+              "description": "The unique identifier for the session."
+            },
+            {
+              "name": "questionId",
+              "description": "The unique identifier for the question."
+            }
+          ]
+        }
+      },
+      {
+        "path": "sessions/{sessionId}/polls/{pollId}",
+        "definition": {
+          "entityName": "Poll",
+          "schema": {
+            "$ref": "#/backend/entities/Poll"
+          },
+          "description": "Stores polls created for a specific session. Includes denormalized 'sessionId' for authorization independence.",
+          "params": [
+            {
+              "name": "sessionId",
+              "description": "The unique identifier for the session."
+            },
+            {
+              "name": "pollId",
+              "description": "The unique identifier for the poll."
+            }
+          ]
+        }
+      },
+      {
+        "path": "polls/{pollId}/responses/{responseId}",
+        "definition": {
+          "entityName": "PollResponse",
+          "schema": {
+            "$ref": "#/backend/entities/PollResponse"
+          },
+          "description": "Stores poll responses submitted by attendees. Includes denormalized 'pollId' and 'attendeeId' for authorization independence.",
+          "params": [
+            {
+              "name": "pollId",
+              "description": "The unique identifier for the poll."
+            },
+            {
+              "name": "responseId",
+              "description": "The unique identifier for the poll response."
+            }
+          ]
+        }
+      },
+      {
+        "path": "attendees/{attendeeId}",
+        "definition": {
+          "entityName": "Attendee",
+          "schema": {
+            "$ref": "#/backend/entities/Attendee"
+          },
+          "description": "Stores attendee profiles.",
+          "params": [
+            {
+              "name": "attendeeId",
+              "description": "The unique identifier for the attendee."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support real-time Q&A and polling features for the leadership summit, emphasizing security, scalability, and ease of debugging. It leverages denormalization to ensure authorization independence and structural segregation to maintain a homogeneous security posture across collections.\n\n**Authorization Independence:**  Each document that requires authorization context (e.g., Questions, PollResponses) includes the `sessionId` and/or `attendeeId`. This denormalization avoids the need for `get()` calls in security rules, allowing atomic operations (transactions/batches) and simplifying debugging.\n\n**QAPs Support:**\n*   **Questions:** Stored in a subcollection under `sessions/{sessionId}/questions/{questionId}`. This allows listing questions specific to a session, and rules can easily ensure that only authenticated users can create questions within a session.\n*   **Polls:** Stored in a subcollection under `sessions/{sessionId}/polls/{pollId}`.  This allows for listing polls specific to a session.\n*   **PollResponses:**  Stored in a subcollection under `polls/{pollId}/responses/{responseId}`. This allows for listing poll responses specific to a poll and user. The security rules can enforce that each attendee can only submit one response per poll by checking `request.auth.uid` against `attendeeId`.\n\n**Structural Segregation:** The data is segregated into collections and subcollections based on entity relationships. This ensures that all documents within a collection share the same security requirements. For example, all questions in `sessions/{sessionId}/questions` are associated with a specific session and accessible to attendees. All polls are managed at `sessions/{sessionId}/polls/{pollId}`.  All poll responses are managed at `polls/{pollId}/responses/{responseId}`.\n\n**Access Modeling:**\n*   **Path-Based Ownership:**  Attendee-generated content (Questions, PollResponses) are implicitly owned via the `attendeeId` field.\n\n**Invariants:**  The structure supports the integrity of ownership (via `attendeeId` and `sessionId`), timestamps (via `timestamp` fields), and denormalized data. Security rules can enforce that these fields are immutable after creation."
+  }
+}
