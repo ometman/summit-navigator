@@ -71,7 +71,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
     error: questionsError,
   } = useCollection<Question>(questionsQuery);
 
-  const handleQuestionSubmit = async () => {
+  const handleQuestionSubmit = () => {
     if (!newQuestion.trim() || !user || !questionsRef) {
       return;
     }
@@ -86,15 +86,17 @@ export function QandA({ sessionId }: { sessionId: string }) {
       timestamp: serverTimestamp(),
       upvotedBy: [],
     };
-
-    try {
-      await addDocumentNonBlocking(questionsRef, questionData);
-      setNewQuestion('');
-    } catch (e: any) {
-      setLocalError('Failed to submit your question. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    
+    addDocumentNonBlocking(questionsRef, questionData)
+      .then(() => {
+        setNewQuestion('');
+      })
+      .catch((e: any) => {
+        setLocalError('Failed to submit your question. Please try again.');
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   const handleUpvote = (questionId: string) => {
@@ -118,7 +120,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-3 text-2xl font-bold text-primary">
           <MessageCircle className="h-7 w-7" />
-          <span>Live Q&A</span>
+          <span>Live Q&amp;A</span>
         </CardTitle>
         <CardDescription>
           Ask a question or upvote your favorites. The most popular questions will be addressed by the speaker.
