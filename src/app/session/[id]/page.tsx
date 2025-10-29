@@ -27,7 +27,7 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const ContentComponent = contentComponents[session.id] || GenericContent;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8">
+    <>
       <div className="mb-6">
         <BackButton />
       </div>
@@ -41,7 +41,7 @@ export default function SessionPage({ params }: { params: { id: string } }) {
         <h3 className="text-2xl font-bold text-gray-800 mb-4 mt-8 border-b pb-2">Session Overview</h3>
         <ContentComponent session={session} />
       </div>
-    </div>
+    </>
   );
 }
 
