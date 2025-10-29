@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { ThumbsUp, MessageCircle, Send, Loader2, User } from 'lucide-react';
+import { ThumbsUp, MessageCircle, Send, Loader2, User, AlertCircle } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -95,7 +95,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
             requestResourceData: questionData,
         });
         errorEmitter.emit('permission-error', contextualError);
-        setLocalError('Failed to submit your question. Please try again.');
+        setLocalError('Failed to submit your question. Please check your permissions and try again.');
         console.error("Submission error:", e);
     } finally {
       setIsSubmitting(false);
@@ -183,6 +183,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
 
         {localError && (
           <Alert variant="destructive" className="mb-4">
+             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Submission Failed</AlertTitle>
             <AlertDescription>{localError}</AlertDescription>
           </Alert>
@@ -194,10 +195,10 @@ export function QandA({ sessionId }: { sessionId: string }) {
             </div>
         ) : questionsError ? (
             <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error Loading Questions</AlertTitle>
                 <AlertDescription>
-                There was a problem fetching the Q&amp;A. Please check your connection
-                and try again.
+                There was a problem fetching the Q&amp;A. This is likely a permissions issue. The security rules may need to be updated.
                 </AlertDescription>
             </Alert>
         ) : (
