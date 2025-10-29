@@ -14,9 +14,13 @@
           "type": "string",
           "description": "Reference to Session. (Relationship: Session 1:N Question) The ID of the session this question belongs to."
         },
-        "attendeeId": {
+        "authorId": {
           "type": "string",
-          "description": "Reference to Attendee. (Relationship: Attendee 1:N Question) The ID of the attendee who submitted the question."
+          "description": "The ID of the attendee who submitted the question."
+        },
+        "author": {
+          "type": "string",
+          "description": "The display name of the user who submitted the question."
         },
         "text": {
           "type": "string",
@@ -27,18 +31,26 @@
           "description": "The date and time the question was submitted.",
           "format": "date-time"
         },
-        "isAnswered": {
-          "type": "boolean",
-          "description": "Indicates whether the question has been answered."
+        "upvotes": {
+          "type": "number",
+          "description": "The number of upvotes the question has received."
+        },
+        "upvotedBy": {
+          "type": "array",
+          "description": "An array of user IDs who have upvoted the question.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
-        "id",
         "sessionId",
-        "attendeeId",
+        "authorId",
+        "author",
         "text",
         "timestamp",
-        "isAnswered"
+        "upvotes",
+        "upvotedBy"
       ]
     },
     "Poll": {
@@ -245,7 +257,7 @@
           "schema": {
             "$ref": "#/backend/entities/Question"
           },
-          "description": "Stores questions submitted for a specific session. Includes denormalized 'sessionId' and 'attendeeId' for authorization independence.",
+          "description": "Stores questions submitted for a specific session. Includes denormalized 'sessionId' and 'authorId' for authorization independence.",
           "params": [
             {
               "name": "sessionId",

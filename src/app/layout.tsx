@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Header } from '@/components/dashboard/header';
+import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
   title: 'Leadership Summit Navigator',
@@ -21,11 +22,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <div className="max-w-7xl mx-auto p-4 md:p-8">
-            <Header />
-            {children}
-        </div>
-        <Toaster />
+        <FirebaseClientProvider>
+            <div className="max-w-7xl mx-auto p-4 md:p-8">
+                <Header />
+                {children}
+            </div>
+            <Toaster />
+        </FirebaseClientProvider>
       </body>
     </html>
   );
