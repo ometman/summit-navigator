@@ -1,75 +1,13 @@
+
 rules_version = '2';
+
 service cloud.firestore {
-
-  // Helper functions for common authentication checks
-  function isAuthenticated() {
-    return request.auth != null;
-  }
-
-  function isOwner(userId) {
-    return isAuthenticated() && request.auth.uid == userId;
-  }
-
-  // Checks if the user is the owner and the document already exists (used for update/delete checks)
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
-  }
-
   match /databases/{database}/documents {
 
-    // --- Session Metadata (Read Only) ---
-    match /sessions/{sessionId} {
-      // Allows anyone to read session details.
-      allow read: if true;
-      // All writes are restricted to backend processes.
-      allow write: if false;
-    }
-
-    // --- Questions (Authenticated Read, Owner Write) ---
+    // Allow any authenticated user to read and write to the 'questions'
+    // subcollection within any session document.
     match /sessions/{sessionId}/questions/{questionId} {
-      
-      // Allows any authenticated user to read (get, list) all questions for the session.
-      allow read: if isAuthenticated();
-
-      // Creation requires authorId and sessionId to match the authenticated user's UID and the path's ID.
-      allow create: if isAuthenticated() 
-                      && request.resource.data.authorId == request.auth.uid 
-                      && request.resource.data.sessionId == sessionId;
-
-      // Update/Delete requires the user to be the owner of the existing document.
-      allow update, delete: if isExistingOwner(resource.data.authorId);
-    }
-
-    // --- Polls (Read Only) ---
-    match /sessions/{sessionId}/polls/{pollId} {
-      // Allows anyone to read poll metadata.
-      allow read: if true;
-      // All writes are restricted to backend processes.
-      allow write: if false;
-    }
-
-    // --- Poll Responses (Owner Read/Write Only) ---
-    match /polls/{pollId}/responses/{responseId} {
-      
-      // Allow read (get only) if the user is the owner of the existing response. 
-      // Listing of all responses is denied for security.
-      allow read: if isExistingOwner(resource.data.attendeeId);
-
-      // Creation requires attendeeId and pollId to match the authenticated user's UID and the path's ID.
-      allow create: if isAuthenticated() 
-                      && request.resource.data.attendeeId == request.auth.uid
-                      && request.resource.data.pollId == pollId; 
-
-      // Update/Delete requires the user to be the owner of the existing document.
-      allow update, delete: if isExistingOwner(resource.data.attendeeId);
-    }
-
-    // --- Attendee Profiles (Read Only) ---
-    match /attendees/{attendeeId} {
-      // Allows anyone to read attendee profiles.
-      allow read: if true;
-      // All writes are restricted to backend processes.
-      allow write: if false;
+      allow read, write: if request.auth != null;
     }
   }
 }
