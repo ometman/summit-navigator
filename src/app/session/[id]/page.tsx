@@ -9,6 +9,7 @@ import Session3Content from "@/components/session/content/session-3";
 import Session4Content from "@/components/session/content/session-4";
 import Session5Content from "@/components/session/content/session-5";
 import Session6Content from "@/components/session/content/session-6";
+import AiSummary from "@/components/session/ai-summary";
 
 const contentComponents: { [key: number]: React.FC<{ session: Session }> } = {
   2: Session2Content,
@@ -42,6 +43,13 @@ export default function SessionPage({ params }: { params: { id: string } }) {
         <SessionHeader session={session} />
         <hr className="mb-6 mt-4" />
         <SessionStats session={session} />
+        
+        <AiSummary 
+          speaker={session.speaker}
+          topic={session.title}
+          intendedAudience={session.summary} 
+        />
+
         <h3 className="text-2xl font-bold text-gray-800 mb-4 mt-8 border-b pb-2">Session Overview</h3>
         <ContentComponent session={session} />
       </div>

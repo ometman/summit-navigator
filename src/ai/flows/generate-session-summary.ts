@@ -1,5 +1,3 @@
-// This file is machine-generated - edit at your own risk!
-
 'use server';
 
 /**
@@ -22,7 +20,7 @@ const GenerateSessionSummaryInputSchema = z.object({
 export type GenerateSessionSummaryInput = z.infer<typeof GenerateSessionSummaryInputSchema>;
 
 const GenerateSessionSummaryOutputSchema = z.object({
-  summary: z.string().describe('A short, informative summary of the leadership session.'),
+  summary: z.string().describe('A short, informative summary of the leadership session, formatted as a single paragraph with no more than 3 sentences.'),
 });
 
 export type GenerateSessionSummaryOutput = z.infer<typeof GenerateSessionSummaryOutputSchema>;
@@ -35,15 +33,15 @@ const prompt = ai.definePrompt({
   name: 'generateSessionSummaryPrompt',
   input: {schema: GenerateSessionSummaryInputSchema},
   output: {schema: GenerateSessionSummaryOutputSchema},
-  prompt: `You are an AI assistant that generates summaries for leadership sessions.
+  prompt: `You are an expert AI assistant tasked with generating concise summaries for a leadership summit.
 
-  Given the following information, create a short, informative summary of the leadership session.
+Given the following information, create a short, informative summary of the leadership session. The summary should be a single paragraph, no more than three sentences long.
 
-  Speaker: {{{speaker}}}
-  Topic: {{{topic}}}
-  Intended Audience: {{{intendedAudience}}}
+Speaker: {{{speaker}}}
+Topic: {{{topic}}}
+Intended Audience: {{{intendedAudience}}}
 
-  Summary: `,
+Generate the summary now.`,
 });
 
 const generateSessionSummaryFlow = ai.defineFlow(
