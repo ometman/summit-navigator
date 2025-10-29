@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   useFirestore,
   useUser,
@@ -45,15 +45,22 @@ export function QandA({ sessionId }: { sessionId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { firestore } = useFirestore();
+  const { firestore } = useFirestore() || {};
   const { user, isUserLoading } = useUser();
 
   const questionsRef = useMemoFirebase(
-    () => collection(firestore, 'sessions', sessionId, 'questions'),
+    () => {
+      if (!firestore) return null;
+      return collection(firestore, 'sessions', sessionId, 'questions');
+    },
     [firestore, sessionId]
   );
+
   const questionsQuery = useMemoFirebase(
-    () => query(questionsRef, orderBy('upvotes', 'desc')),
+    () => {
+      if (!questionsRef) return null;
+      return query(questionsRef, orderBy('upvotes', 'desc'));
+    },
     [questionsRef]
   );
 
@@ -64,7 +71,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
   } = useCollection<Question>(questionsQuery);
 
   const handleQuestionSubmit = async () => {
-    if (!newQuestion.trim() || !user) {
+    if (!newQuestion.trim() || !user || !questionsRef) {
       return;
     }
     setIsSubmitting(true);
@@ -90,7 +97,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
   };
 
   const handleUpvote = (questionId: string) => {
-    if (!user) return;
+    if (!user || !firestore) return;
     const question = questions?.find((q) => q.id === questionId);
     if (!question || question.upvotedBy.includes(user.uid)) {
       return; // Already upvoted
@@ -103,7 +110,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
     });
   };
 
-  if (isUserLoading || isLoadingQuestions) {
+  if (isUserLoading || isLoadingQuestions || !firestore) {
     return (
       <Card className="mt-8 bg-muted/20">
         <CardHeader>
