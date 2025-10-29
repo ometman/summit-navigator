@@ -18,6 +18,7 @@ import {
   doc,
   serverTimestamp,
   increment,
+  arrayUnion,
 } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,44 +107,11 @@ export function QandA({ sessionId }: { sessionId: string }) {
     const questionRef = doc(firestore, 'sessions', sessionId, 'questions', questionId);
     updateDocumentNonBlocking(questionRef, {
       upvotes: increment(1),
-      upvotedBy: [...question.upvotedBy, user.uid],
+      upvotedBy: arrayUnion(user.uid),
     });
   };
 
-  if (isUserLoading || isLoadingQuestions || !firestore) {
-    return (
-      <Card className="mt-8 bg-muted/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-xl text-primary">
-            <MessageCircle className="h-6 w-6" />
-            <span>Live Q&A</span>
-          </CardTitle>
-          <CardDescription>Loading questions...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-24">
-            <Loader2 className="animate-spin text-primary" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (questionsError) {
-    return (
-      <Card className="mt-8">
-        <CardContent className="pt-6">
-          <Alert variant="destructive">
-            <AlertTitle>Error Loading Questions</AlertTitle>
-            <AlertDescription>
-              There was a problem fetching the Q&A. Please check your connection
-              and try again.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+  const isComponentLoading = isUserLoading || isLoadingQuestions;
 
   return (
     <Card className="mt-8 bg-muted/20 border-t-4 border-primary/50 shadow-lg">
@@ -186,44 +154,58 @@ export function QandA({ sessionId }: { sessionId: string }) {
           </Alert>
         )}
 
-        <div className="space-y-4">
-          {questions && questions.length > 0 ? (
-            questions.map((q) => (
-              <div
-                key={q.id}
-                className="flex items-start gap-4 p-4 bg-card rounded-lg shadow-sm border"
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleUpvote(q.id)}
-                    disabled={!user || q.upvotedBy?.includes(user.uid)}
-                    className="group"
-                  >
-                    <ThumbsUp className={`h-5 w-5 ${q.upvotedBy?.includes(user?.uid || '') ? 'text-primary fill-primary/20' : 'text-slate-500 group-hover:text-primary'}`} />
-                  </Button>
-                  <span className="font-bold text-sm text-primary">{q.upvotes}</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-foreground">{q.text}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                    <User className="h-3 w-3" />
-                    <span>{q.author}</span>
-                    <span>
-                      {q.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
-              <p className="text-muted-foreground font-medium">No questions yet.</p>
-              <p className="text-sm text-muted-foreground/80">Be the first to ask something!</p>
+        {isComponentLoading ? (
+            <div className="flex items-center justify-center h-24">
+                <Loader2 className="animate-spin text-primary" />
             </div>
-          )}
-        </div>
+        ) : questionsError ? (
+            <Alert variant="destructive">
+                <AlertTitle>Error Loading Questions</AlertTitle>
+                <AlertDescription>
+                There was a problem fetching the Q&amp;A. Please check your connection
+                and try again.
+                </AlertDescription>
+            </Alert>
+        ) : (
+            <div className="space-y-4">
+            {questions && questions.length > 0 ? (
+                questions.map((q) => (
+                <div
+                    key={q.id}
+                    className="flex items-start gap-4 p-4 bg-card rounded-lg shadow-sm border"
+                >
+                    <div className="flex flex-col items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleUpvote(q.id)}
+                        disabled={!user || q.upvotedBy?.includes(user.uid)}
+                        className="group"
+                    >
+                        <ThumbsUp className={`h-5 w-5 ${q.upvotedBy?.includes(user?.uid || '') ? 'text-primary fill-primary/20' : 'text-slate-500 group-hover:text-primary'}`} />
+                    </Button>
+                    <span className="font-bold text-sm text-primary">{q.upvotes}</span>
+                    </div>
+                    <div className="flex-1">
+                    <p className="text-foreground">{q.text}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                        <User className="h-3 w-3" />
+                        <span>{q.author}</span>
+                        <span>
+                        {q.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                    </div>
+                </div>
+                ))
+            ) : (
+                <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg">
+                <p className="text-muted-foreground font-medium">No questions yet.</p>
+                <p className="text-sm text-muted-foreground/80">Be the first to ask something!</p>
+                </div>
+            )}
+            </div>
+        )}
       </CardContent>
     </Card>
   );
