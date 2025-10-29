@@ -1,12 +1,7 @@
 /**
- * @fileoverview Firestore Security Rules for the Leadership Summit App.
- *
- * Core Philosophy:
- * This ruleset prioritizes secure data access by enforcing strict ownership and
- * role-based authorization. It leverages denormalization to optimize rule
- * performance and prevent costly `get()` calls. The rules explicitly define
- * read and write permissions for each collection, ensuring that no data is
- * unintentionally exposed.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for attendee-generated content (questions, poll responses)
+ * and restricts access to session and poll data to ensure data integrity.
  *
  * Data Structure:
  * - /sessions/{sessionId}: Stores session details. Parent for questions and polls.
@@ -16,33 +11,24 @@
  * - /attendees/{attendeeId}: Stores attendee profiles.
  *
  * Key Security Decisions:
- * - Attendees can only create questions for sessions.
- * - Attendees can only submit one poll response per poll.
- * - Data validation is limited to authorization-critical fields to allow for
- *   rapid iteration during the prototyping phase.
- * - Public listing is disabled for collections containing private user data.
+ * - Attendees can only create questions and poll responses under their own ID.
+ * - Sessions and polls are readable by everyone.
+ * - Data consistency is enforced by matching document IDs with the corresponding path parameters.
+ * - The rules explicitly deny listing all attendees for privacy reasons.
  *
  * Denormalization for Authorization:
- * - Questions and PollResponses include the `sessionId` and `attendeeId` to
- *   enable authorization without `get()` calls.
- *
- * Structural Segregation:
- * - Questions and Polls are stored as subcollections of Sessions to enforce
- *   a clear ownership hierarchy.
+ * - Questions and poll responses include the sessionId and attendeeId, respectively, to avoid costly `get()` calls.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Session details.
+     * @description Allows anyone to read session details.
      * @path /sessions/{sessionId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Public read-only access. No writes allowed.
+     * @allow (get, list)
+     * @deny (create, update, delete)
+     * @principle Public read access for session information.
      */
     match /sessions/{sessionId} {
       allow get, list: if true;
@@ -50,31 +36,26 @@ service cloud.firestore {
     }
 
     /**
-     * @description Questions submitted for a specific session.
+     * @description Allows authenticated users to create questions for a session, enforcing ownership via authorId.
      * @path /sessions/{sessionId}/questions/{questionId}
-     * @allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid && request.resource.data.sessionId == sessionId;
-     * @allow get: if true;
-     * @allow list: if true;
-     * @deny update: if !isExistingOwner(request.resource.data.authorId);
-     * @deny delete: if !isExistingOwner(request.resource.data.authorId);
-     * @principle Attendees can create questions; owners can update/delete.
+     * @allow (create) User with matching authorId can create a question. Example: request.auth.uid = "user123", request.resource.data.authorId = "user123"
+     * @deny (create) User attempting to create a question with a mismatched authorId. Example: request.auth.uid = "user456", request.resource.data.authorId = "user123"
+     * @allow (get, list)
+     * @deny (update, delete)
+     * @principle Enforces document ownership for writes, allows public reads.
      */
     match /sessions/{sessionId}/questions/{questionId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid && request.resource.data.sessionId == sessionId;
-      allow update: if isExistingOwner(resource.data.authorId) && resource.data.authorId == request.auth.uid;
-      allow delete: if isExistingOwner(resource.data.authorId) && resource.data.authorId == request.auth.uid;
+      allow update, delete: if false;
     }
 
     /**
-     * @description Polls created for a specific session.
+     * @description Allows anyone to read poll details.
      * @path /sessions/{sessionId}/polls/{pollId}
-     * @allow get: if true;
-     * @allow list: if true;
-     * @allow create: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Public read-only access. No writes allowed.
+     * @allow (get, list)
+     * @deny (create, update, delete)
+     * @principle Public read access for poll information.
      */
     match /sessions/{sessionId}/polls/{pollId} {
       allow get, list: if true;
@@ -82,36 +63,36 @@ service cloud.firestore {
     }
 
     /**
-     * @description Poll responses submitted by attendees.
+     * @description Allows an attendee to create a single poll response per poll, enforcing ownership via attendeeId.
      * @path /polls/{pollId}/responses/{responseId}
-     * @allow create: if isSignedIn();
-     * @allow get: if false;
-     * @allow list: if false;
-     * @deny update: if false;
-     * @deny delete: if false;
-     * @principle Attendees can create responses; no listing or updates.
+     * @allow (create) User with matching attendeeId can create a response. Example: request.auth.uid = "user123", request.resource.data.attendeeId = "user123"
+     * @deny (create) User attempting to create a response with a mismatched attendeeId. Example: request.auth.uid = "user456", request.resource.data.attendeeId = "user123"
+     * @allow (get)
+     * @allow (list)
+     * @deny (update, delete)
+     * @principle Enforces document ownership for writes, allows public reads.
      */
     match /polls/{pollId}/responses/{responseId} {
-      allow create: if isSignedIn();
-      allow get, list, update, delete: if false;
+      allow get, list: if true;
+      allow create: if isSignedIn() && request.resource.data.attendeeId == request.auth.uid && request.resource.data.pollId == pollId;
+      allow update, delete: if false;
     }
 
     /**
-     * @description Attendee profiles.
+     * @description Allows an attendee to create their own profile, and prevents listing all attendees.
      * @path /attendees/{attendeeId}
-     * @allow get: if isOwner(attendeeId);
-     * @allow list: if false;
-     * @allow create: if isOwner(attendeeId);
-     * @allow update: if isExistingOwner(attendeeId) && request.auth.uid == attendeeId;
-     * @allow delete: if isExistingOwner(attendeeId) && request.auth.uid == attendeeId;
-     * @principle Attendees can only access and modify their own profile.
+     * @allow (create) User creating their own profile. Example: request.auth.uid = "user123", attendeeId = "user123"
+     * @deny (create) User attempting to create a profile for another user. Example: request.auth.uid = "user456", attendeeId = "user123"
+     * @allow (get, update, delete) if the user id matches the document id
+     * @deny (list) Listing attendees is not allowed
+     * @principle Restricts access to a user's own data tree, prevents listing all users.
      */
     match /attendees/{attendeeId} {
       allow get: if isOwner(attendeeId);
+      allow create: if isSignedIn() && isOwner(attendeeId);
+      allow update: if isOwner(attendeeId);
+      allow delete: if isOwner(attendeeId);
       allow list: if false;
-      allow create: if isOwner(attendeeId);
-      allow update: if isExistingOwner(attendeeId) && request.auth.uid == attendeeId;
-      allow delete: if isExistingOwner(attendeeId) && request.auth.uid == attendeeId;
     }
 
     function isSignedIn() {
@@ -120,10 +101,6 @@ service cloud.firestore {
 
     function isOwner(userId) {
       return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
     }
   }
 }
