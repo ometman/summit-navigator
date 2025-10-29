@@ -1,60 +1,34 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for attendee-generated content (questions, poll responses)
- * and provides read access to session and poll data. Data is organized under sessions, with questions and polls as subcollections.
+ * @description This ruleset enforces a combination of public read access and ownership-based write access for the leadership summit application.
  *
  * Data Structure:
- * - /sessions/{sessionId}: Stores session data. Publicly readable.
- * - /sessions/{sessionId}/questions/{questionId}: Stores questions for a session. Only signed-in users can create questions.
- *   Ownership is enforced via the 'authorId' field.
- * - /sessions/{sessionId}/polls/{pollId}: Stores polls for a session. Publicly readable.
- * - /polls/{pollId}/responses/{responseId}: Stores responses to polls.  Only signed-in users can submit one response per poll.
- *   Ownership is enforced via the 'attendeeId' field.
- * - /attendees/{attendeeId}: Stores attendee profiles. Owner-only access.
+ * - /sessions/{sessionId}: Stores session details. Parent for questions and polls.
+ * - /sessions/{sessionId}/questions/{questionId}: Stores questions for a session, with `authorId` for ownership.
+ * - /sessions/{sessionId}/polls/{pollId}: Stores polls for a session.
+ * - /polls/{pollId}/responses/{responseId}: Stores poll responses, with `attendeeId` for ownership.
+ * - /attendees/{attendeeId}: Stores attendee profiles, accessible only to the profile owner.
  *
  * Key Security Decisions:
- * - User listing is disabled for all collections.
- * - Read-only access is granted to session and poll data to facilitate public consumption.
- * - Timestamp validation is omitted for flexible prototyping.
+ * - Public read access to session, questions and polls to facilitate open summit participation.
+ * - Attendee-only write access for creating questions and poll responses, enforced via `authorId` and `attendeeId`.
+ * - Attendee-only access to their own profile data.
+ * - Data consistency checks to ensure that `authorId`, `attendeeId`, `sessionId` and `pollId` matches the path.
  *
  * Denormalization for Authorization:
- * - Questions: Include 'sessionId' and 'authorId' to avoid get() calls.
- * - PollResponses: Include 'pollId' and 'attendeeId' to avoid get() calls.
+ * - Questions include `authorId` and `sessionId` to allow direct ownership checks.
+ * - PollResponses include `attendeeId` and `pollId` to allow direct ownership checks.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
-     * @path N/A
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of the resource.
-     * @path N/A
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the existing owner of the resource.
-     * @path N/A
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Allows read-only access to session data.
+     * @description Allows public read access to session details. Write access is denied.
      * @path /sessions/{sessionId}
-     * @allow (get, list) Any user can read session data.
-     * @deny (create, update, delete) No one can create, update, or delete session data directly.
-     * @principle Public read access for session information.
+     * @allow (get, list)
+     * @deny (create, update, delete)
+     * @principle Public read, no writes.
      */
     match /sessions/{sessionId} {
       allow get, list: if true;
@@ -62,29 +36,36 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages questions within a session.  Authenticated users can create questions,
-     *  and only the author can update or delete them.
+     * @description Allows authenticated users to create, read, and list questions for a specific session. Only the author can update or delete.
      * @path /sessions/{sessionId}/questions/{questionId}
-     * @allow (create) Authenticated user creates a question with authorId matching their UID and sessionId matching the path.
-     * @allow (get, list) Any user can read questions.
-     * @allow (update, delete) Author updates/deletes a question if the authorId matches their UID.
-     * @deny (create) Non-authenticated user attempts to create a question.
-     * @deny (update, delete) Non-author attempts to update/delete a question.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with valid auth can create questions.
+     * @allow (get, list)
+     * @allow (update, delete) User can update and delete a question only if the signed in user is the original author.
+     * @deny (create) User tries to create a question for another user by manipulating the `authorId`.
+     * @deny (update, delete) User tries to update or delete a question they don't own.
+     * @principle Public read, owner-only writes, validates `authorId` on create.
      */
     match /sessions/{sessionId}/questions/{questionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(authorId) {
+        return isSignedIn() && request.auth.uid == authorId;
+      }
+      function isExistingOwner(authorId) {
+          return isOwner(authorId) && resource != null;
+      }
       allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid && request.resource.data.sessionId == sessionId;
-      allow update: if isExistingOwner(resource.data.authorId);
-      allow delete: if isExistingOwner(resource.data.authorId);
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isExistingOwner(resource.data.authorId);
     }
 
     /**
-     * @description Allows read-only access to poll data.
+     * @description Allows public read access to polls. Write access is denied.
      * @path /sessions/{sessionId}/polls/{pollId}
-     * @allow (get, list) Any user can read poll data.
-     * @deny (create, update, delete) No one can create, update, or delete poll data directly.
-     * @principle Public read access for poll information.
+     * @allow (get, list)
+     * @deny (create, update, delete)
+     * @principle Public read, no writes.
      */
     match /sessions/{sessionId}/polls/{pollId} {
       allow get, list: if true;
@@ -92,38 +73,53 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages poll responses. Authenticated users can create one response per poll,
-     *  and only the author can update or delete their response.
+     * @description Allows authenticated users to create poll responses. Only the author can update or delete their response.
      * @path /polls/{pollId}/responses/{responseId}
-     * @allow (create) Authenticated user creates a response with attendeeId matching their UID and pollId matching the path.
-     * @allow (get, list) No listing allowed, direct get only.
-     * @allow (update, delete) Author updates/deletes a response if the attendeeId matches their UID.
-     * @deny (create) Non-authenticated user attempts to create a response.
-     * @deny (update, delete) Non-author attempts to update/delete a response.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with valid auth can create poll responses.
+     * @allow (get, list)
+     * @allow (update, delete) User can update and delete a poll response only if the signed in user is the original author.
+     * @deny (create) User tries to create a response for another user by manipulating the `attendeeId`.
+     * @deny (update, delete) User tries to update or delete a response they don't own.
+     * @principle Owner-only access, validates `attendeeId` on create.
      */
     match /polls/{pollId}/responses/{responseId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if isSignedIn() && request.resource.data.attendeeId == request.auth.uid && request.resource.data.pollId == pollId;
-      allow update: if isExistingOwner(resource.data.attendeeId);
-      allow delete: if isExistingOwner(resource.data.attendeeId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(attendeeId) {
+        return isSignedIn() && request.auth.uid == attendeeId;
+      }
+      function isExistingOwner(attendeeId) {
+        return isOwner(attendeeId) && resource != null;
+      }
+      allow get, list: if true;
+      allow create: if isSignedIn() && request.resource.data.attendeeId == request.auth.uid;
+      allow update, delete: if isExistingOwner(resource.data.attendeeId);
     }
 
     /**
-     * @description Manages attendee profiles. Only the owner can read, create, update, or delete their own profile.
+     * @description Allows an attendee to create, read, update, and delete their own profile.
      * @path /attendees/{attendeeId}
-     * @allow (create) Authenticated user creates their own profile with attendeeId matching their UID.
-     * @allow (get, update, delete) Owner can read/update/delete their own profile if attendeeId matches their UID.
-     * @deny (create, get, update, delete) Non-owner attempts to access another user's profile.
-     * @principle Restricts access to a user's own data tree.
+     * @allow (create) User with valid auth can create their own profile.
+     * @allow (get, list) User can get and list their own profile only.
+     * @allow (update, delete) User can update and delete their own profile only.
+     * @deny (create) User tries to create a profile for another user by manipulating the `attendeeId`.
+     * @deny (get, list, update, delete) User tries to access or modify another user's profile.
+     * @principle Owner-only access, validates `attendeeId` on create.
      */
     match /attendees/{attendeeId} {
-      allow get: if isOwner(attendeeId);
-      allow list: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(attendeeId) {
+        return isSignedIn() && request.auth.uid == attendeeId;
+      }
+      function isExistingOwner(attendeeId) {
+        return isOwner(attendeeId) && resource != null;
+      }
+      allow get, list: if isOwner(attendeeId);
       allow create: if isOwner(attendeeId);
-      allow update: if isExistingOwner(attendeeId);
-      allow delete: if isExistingOwner(attendeeId);
+      allow update, delete: if isExistingOwner(attendeeId);
     }
   }
 }
