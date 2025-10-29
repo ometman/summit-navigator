@@ -1,31 +1,29 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Calendar, Users } from 'lucide-react';
-import { Header } from '@/components/dashboard/header';
+import { ArrowRight, Calendar, Users,LogIn } from 'lucide-react';
 
 export default function HomePage() {
   return (
     <>
-      <Header />
       <main className="flex-1">
-        <section className="py-24 md:py-32 text-center">
+        <section className="py-24 md:py-32 text-center bg-white rounded-xl shadow-md">
           <div className="container px-4 md:px-6">
             <div className="max-w-3xl mx-auto">
-              <h2 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tighter mb-4">
+              <h1 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tighter mb-4">
                 Welcome to the Summit Navigator
-              </h2>
+              </h1>
               <p className="text-xl text-muted-foreground mb-8">
                 Your interactive guide to the premier leadership training event of the year.
               </p>
-              <div className="flex justify-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <Button asChild size="lg">
                   <Link href="/dashboard">
                     View Dashboard <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
                 </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link href="/dashboard">
-                    Explore Sessions <Calendar className="ml-2 h-5 w-5" />
+                <Button asChild size="lg" variant="secondary">
+                  <Link href="/login">
+                    Register or Login <LogIn className="ml-2 h-5 w-5" />
                   </Link>
                 </Button>
               </div>
@@ -33,7 +31,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="bg-muted py-20">
+        <section className="py-20">
             <div className="container px-4 md:px-6">
                 <div className="grid md:grid-cols-3 gap-12 text-center">
                     <div className="flex flex-col items-center">
