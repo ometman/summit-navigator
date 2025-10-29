@@ -2,19 +2,23 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, LogIn } from "lucide-react";
 import { agendaData, type Session } from "@/lib/data";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/firebase";
 
 function SessionItem({
   session,
   isSelected,
   onSelect,
+  isAnonymous,
 }: {
   session: Session;
   isSelected: boolean;
   onSelect: () => void;
+  isAnonymous: boolean;
 }) {
   const speakerUrl = `/speaker/${session.speaker.replace(/\s/g, "+")}`;
   return (
@@ -37,16 +41,25 @@ function SessionItem({
             </Link>
           </p>
         </div>
-        <Button
-          asChild
-          className="whitespace-nowrap"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Link href={`/session/${session.id}`}>
-            <ClipboardList className="mr-2 h-4 w-4" />
-            Details
-          </Link>
-        </Button>
+        {isAnonymous ? (
+            <Link href="/login" onClick={(e) => e.stopPropagation()}>
+                <Badge variant="secondary" className="whitespace-nowrap hover:bg-primary/10">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Login to view details
+                </Badge>
+            </Link>
+        ) : (
+            <Button
+            asChild
+            className="whitespace-nowrap"
+            onClick={(e) => e.stopPropagation()}
+            >
+            <Link href={`/session/${session.id}`}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Details
+            </Link>
+            </Button>
+        )}
       </div>
       {isSelected && (
         <div className="p-4 pt-3 border-t bg-muted/30 text-muted-foreground">
@@ -76,6 +89,7 @@ function SessionItem({
 
 export function AgendaList() {
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const { user, isUserLoading } = useUser();
 
   const morningSessions = agendaData.filter((s) => !s.afternoon);
   const afternoonSessions = agendaData.filter((s) => s.afternoon);
@@ -83,6 +97,8 @@ export function AgendaList() {
   const handleSelect = (sessionId: number) => {
     setSelectedSessionId((prev) => (prev === sessionId ? null : sessionId));
   };
+  
+  const isAnonymous = !user || user.isAnonymous;
 
   return (
     <div className="space-y-3">
@@ -95,6 +111,7 @@ export function AgendaList() {
               session={session}
               isSelected={selectedSessionId === session.id}
               onSelect={() => handleSelect(session.id)}
+              isAnonymous={isAnonymous}
             />
           ))}
         </div>
@@ -113,6 +130,7 @@ export function AgendaList() {
               session={session}
               isSelected={selectedSessionId === session.id}
               onSelect={() => handleSelect(session.id)}
+              isAnonymous={isAnonymous}
             />
           ))}
         </div>
