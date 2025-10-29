@@ -20,6 +20,8 @@ import {
 } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { ThumbsUp, MessageCircle, Send, Loader2, User } from 'lucide-react';
 import {
   Card,
@@ -43,6 +45,7 @@ interface Question {
 
 export function QandA({ sessionId }: { sessionId: string }) {
   const [newQuestion, setNewQuestion] = useState('');
+  const [postAnonymously, setPostAnonymously] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -74,7 +77,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
 
     const questionData = {
       text: newQuestion,
-      author: user.isAnonymous ? 'Anonymous' : user.displayName || 'Anonymous',
+      author: postAnonymously ? 'Anonymous' : user.displayName || 'Anonymous',
       authorId: user.uid,
       upvotes: 0,
       timestamp: serverTimestamp(),
@@ -84,6 +87,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
     try {
       await addDoc(questionsRef, questionData);
       setNewQuestion('');
+      setPostAnonymously(false);
     } catch (e: any) {
         const contextualError = new FirestorePermissionError({
             path: questionsRef.path,
@@ -139,26 +143,42 @@ export function QandA({ sessionId }: { sessionId: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-2 mb-6">
-          <Input
-            type="text"
-            placeholder={user ? "Type your question here..." : "Authenticating..."}
-            value={newQuestion}
-            onChange={(e) => setNewQuestion(e.target.value)}
-            disabled={isSubmitting || !user}
-            onKeyDown={(e) => e.key === 'Enter' && !isSubmitting && handleQuestionSubmit()}
-          />
-          <Button
-            onClick={handleQuestionSubmit}
-            disabled={isSubmitting || !newQuestion.trim() || !user}
-          >
-            {isSubmitting ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Send />
-            )}
-            <span className="sr-only">Submit question</span>
-          </Button>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder={user ? "Type your question here..." : "Authenticating..."}
+              value={newQuestion}
+              onChange={(e) => setNewQuestion(e.target.value)}
+              disabled={isSubmitting || !user}
+              onKeyDown={(e) => e.key === 'Enter' && !isSubmitting && handleQuestionSubmit()}
+            />
+            <Button
+              onClick={handleQuestionSubmit}
+              disabled={isSubmitting || !newQuestion.trim() || !user}
+            >
+              {isSubmitting ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Send />
+              )}
+              <span className="sr-only">Submit question</span>
+            </Button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="anonymous"
+              checked={postAnonymously}
+              onCheckedChange={(checked) => setPostAnonymously(checked as boolean)}
+              disabled={isSubmitting || !user}
+            />
+            <Label
+              htmlFor="anonymous"
+              className="text-sm font-medium leading-none text-muted-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Post question anonymously
+            </Label>
+          </div>
         </div>
 
         {localError && (
