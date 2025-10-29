@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { ThumbsUp, MessageCircle, Send, Loader2, User, AlertCircle } from 'lucide-react';
+import { ThumbsUp, MessageCircle, Send, Loader2, User, AlertCircle, Copy, CheckCircle2 } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -16,6 +16,9 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser } from '@/firebase/auth/use-user';
+import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 
 interface Question {
@@ -24,7 +27,8 @@ interface Question {
   author: string;
   upvotes: number;
   timestamp: number;
-  upvotedBy: string[]; // Using a placeholder for user id, could be a generated client id
+  upvotedBy: string[];
+  answered: boolean;
 }
 
 export function QandA({ sessionId }: { sessionId:string }) {
@@ -35,12 +39,11 @@ export function QandA({ sessionId }: { sessionId:string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   
-  // We can still use the user hook to get display name if available
   const { user } = useUser();
   const [clientId, setClientId] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Generate or retrieve a simple client ID for anonymous voting
     let id = localStorage.getItem('qa_client_id');
     if (!id) {
       id = `client_${Date.now()}_${Math.random()}`;
@@ -53,15 +56,7 @@ export function QandA({ sessionId }: { sessionId:string }) {
       const storageKey = `questions_${sessionId}`;
       const storedQuestions = localStorage.getItem(storageKey);
       if (storedQuestions) {
-        const parsedQuestions: Question[] = JSON.parse(storedQuestions);
-        // Sort questions by upvotes and timestamp
-        parsedQuestions.sort((a, b) => {
-          if (b.upvotes !== a.upvotes) {
-            return b.upvotes - a.upvotes;
-          }
-          return b.timestamp - a.timestamp;
-        });
-        setQuestions(parsedQuestions);
+        setQuestions(JSON.parse(storedQuestions));
       }
     } catch (e) {
       console.error("Failed to load questions from local storage", e);
@@ -87,7 +82,6 @@ export function QandA({ sessionId }: { sessionId:string }) {
     setIsSubmitting(true);
     setLocalError(null);
 
-    // Simulate async operation
     await new Promise(resolve => setTimeout(resolve, 300));
     
     const questionData: Question = {
@@ -97,6 +91,7 @@ export function QandA({ sessionId }: { sessionId:string }) {
       upvotes: 0,
       timestamp: Date.now(),
       upvotedBy: [],
+      answered: false,
     };
     
     const updatedQuestions = [questionData, ...questions];
@@ -110,7 +105,6 @@ export function QandA({ sessionId }: { sessionId:string }) {
 
   const handleUpvote = (questionId: string) => {
     const question = questions.find((q) => q.id === questionId);
-    // Use the generated clientId for upvote tracking
     if (!question || question.upvotedBy.includes(clientId)) {
       return; 
     }
@@ -121,25 +115,50 @@ export function QandA({ sessionId }: { sessionId:string }) {
         : q
     );
 
-    // Re-sort after upvoting
-    updatedQuestions.sort((a, b) => {
-      if (b.upvotes !== a.upvotes) {
-        return b.upvotes - a.upvotes;
-      }
-      return b.timestamp - a.timestamp;
-    });
-
     setQuestions(updatedQuestions);
     saveQuestionsToLocalStorage(updatedQuestions);
   };
 
+  const handleToggleAnswered = (questionId: string) => {
+    const updatedQuestions = questions.map(q =>
+        q.id === questionId ? { ...q, answered: !q.answered } : q
+    );
+    setQuestions(updatedQuestions);
+    saveQuestionsToLocalStorage(updatedQuestions);
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+        title: "Copied!",
+        description: "Question text copied to clipboard.",
+    });
+  };
+
+  const sortedQuestions = useMemo(() => {
+    return [...questions].sort((a, b) => {
+        if (a.answered !== b.answered) {
+            return a.answered ? 1 : -1;
+        }
+        if (b.upvotes !== a.upvotes) {
+            return b.upvotes - a.upvotes;
+        }
+        return b.timestamp - a.timestamp;
+    });
+  }, [questions]);
+
   return (
     <Card className="mt-8 bg-muted/20 border-t-4 border-primary/50 shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-3 text-2xl font-bold text-primary">
-          <MessageCircle className="h-7 w-7" />
-          <span>Live Q&amp;A</span>
-        </CardTitle>
+        <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-3 text-2xl font-bold text-primary">
+                <MessageCircle className="h-7 w-7" />
+                <span>Live Q&amp;A</span>
+            </CardTitle>
+            <Badge variant="secondary" className="text-lg">
+                {questions.length} Questions
+            </Badge>
+        </div>
         <CardDescription>
           Ask a question or upvote your favorites. The most popular questions will be addressed by the speaker.
         </CardDescription>
@@ -197,10 +216,10 @@ export function QandA({ sessionId }: { sessionId:string }) {
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
              </div>
-          ) : questions.length > 0 ? (
-            questions.map((question) => (
-              <div key={question.id} className="flex items-start gap-4 p-4 rounded-lg bg-background/60 border">
-                <div className="flex flex-col items-center">
+          ) : sortedQuestions.length > 0 ? (
+            sortedQuestions.map((question) => (
+              <div key={question.id} className={cn("flex items-start gap-4 p-4 rounded-lg bg-background/60 border", {"opacity-60 bg-green-50/50 border-green-200": question.answered})}>
+                <div className="flex flex-col items-center gap-2">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -211,12 +230,27 @@ export function QandA({ sessionId }: { sessionId:string }) {
                         <ThumbsUp className="h-5 w-5" />
                         <span className="font-bold text-sm">{question.upvotes}</span>
                     </Button>
+                     <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCopy(question.text)}
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        title="Copy question text"
+                    >
+                        <Copy className="h-4 w-4" />
+                    </Button>
                 </div>
                 <div className="flex-1">
                   <p className="text-foreground">{question.text}</p>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    <span>{question.author}</span>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        <span>{question.author}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleToggleAnswered(question.id)}>
+                        <CheckCircle2 className={cn("mr-2 h-4 w-4", question.answered ? "text-green-600" : "text-muted-foreground")} />
+                        {question.answered ? "Answered" : "Mark Answered"}
+                    </Button>
                   </div>
                 </div>
               </div>
