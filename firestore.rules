@@ -1,45 +1,39 @@
-/**
- * @file Firestore Security Rules
- * @description This ruleset enforces open access to session and speaker data.
- *
- * Core Philosophy:
- * This ruleset prioritizes simplicity, given the absence of user-specific data or collaborative aspects.
- * Data is treated as public and accessible to all users, authenticated or anonymous.
- *
- * Data Structure:
- * - `/sessions/{sessionId}`: Stores session information.
- * - `/speakers/{speakerId}`: Stores speaker information.
- *
- * Key Security Decisions:
- * - Unauthenticated users are allowed to read all session and speaker data.
- * - Write operations are disallowed to prevent unauthorized data modification.
- */
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Allows read-only access to the sessions collection.
-     * @path /sessions/{sessionId}
-     * @allow (get, list) Any user can read session data.
-     * @deny (create, update, delete) No user can create, update, or delete session data.
-     * @principle Public read access for all session data.
-     */
-    match /sessions/{sessionId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+    // Helper function to check for authentication
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    /**
-     * @description Allows read-only access to the speakers collection.
-     * @path /speakers/{speakerId}
-     * @allow (get, list) Any user can read speaker data.
-     * @deny (create, update, delete) No user can create, update, or delete speaker data.
-     * @principle Public read access for all speaker data.
-     */
+    // Helper function to check if the user is the owner of an existing resource
+    function isOwner(authorId) {
+      return request.auth.uid == authorId;
+    }
+
+    match /sessions/{sessionId} {
+      // Sessions can be read by anyone, but not written to from the client
+      allow read: if true;
+      allow write: if false;
+
+      match /questions/{questionId} {
+        // Allow authenticated users to read (list/get) questions
+        allow read: if isAuthenticated();
+
+        // Allow authenticated users to create questions if they are the author
+        allow create: if isAuthenticated() && isOwner(request.resource.data.authorId);
+
+        // Allow authenticated users to update or delete questions if they are the owner
+        allow update, delete: if isAuthenticated() && isOwner(resource.data.authorId);
+      }
+    }
+
+    // Speakers can be read by anyone, but not written to from the client
     match /speakers/{speakerId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+        allow read: if true;
+        allow write: if false;
     }
   }
 }
