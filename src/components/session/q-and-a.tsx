@@ -8,10 +8,8 @@ import {
   useMemoFirebase,
 } from '@/firebase';
 import {
-  addDocumentNonBlocking,
-  updateDocumentNonBlocking,
-} from '@/firebase/non-blocking-updates';
-import {
+  addDoc,
+  updateDoc,
   collection,
   query,
   orderBy,
@@ -31,6 +29,8 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 interface Question {
   id: string;
@@ -46,24 +46,18 @@ export function QandA({ sessionId }: { sessionId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { firestore } = useFirestore() || {};
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  const questionsRef = useMemoFirebase(
-    () => {
-      if (!firestore) return null;
-      return collection(firestore, 'sessions', sessionId, 'questions');
-    },
-    [firestore, sessionId]
-  );
+  const questionsRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'sessions', sessionId, 'questions');
+  }, [firestore, sessionId]);
 
-  const questionsQuery = useMemoFirebase(
-    () => {
-      if (!questionsRef) return null;
-      return query(questionsRef, orderBy('upvotes', 'desc'), orderBy('timestamp', 'desc'));
-    },
-    [questionsRef]
-  );
+  const questionsQuery = useMemoFirebase(() => {
+    if (!questionsRef) return null;
+    return query(questionsRef, orderBy('upvotes', 'desc'), orderBy('timestamp', 'desc'));
+  }, [questionsRef]);
 
   const {
     data: questions,
@@ -71,8 +65,8 @@ export function QandA({ sessionId }: { sessionId: string }) {
     error: questionsError,
   } = useCollection<Question>(questionsQuery);
 
-  const handleQuestionSubmit = () => {
-    if (!newQuestion.trim() || !user || !questionsRef) {
+  const handleQuestionSubmit = async () => {
+    if (!newQuestion.trim() || !user || !firestore || !questionsRef) {
       return;
     }
     setIsSubmitting(true);
@@ -87,37 +81,51 @@ export function QandA({ sessionId }: { sessionId: string }) {
       upvotedBy: [],
     };
     
-    addDocumentNonBlocking(questionsRef, questionData)
-      .then(() => {
-        setNewQuestion('');
-      })
-      .catch((e: any) => {
-        console.error("Submission error:", e);
+    try {
+      await addDoc(questionsRef, questionData);
+      setNewQuestion('');
+    } catch (e: any) {
+        const contextualError = new FirestorePermissionError({
+            path: questionsRef.path,
+            operation: 'create',
+            requestResourceData: questionData,
+        });
+        errorEmitter.emit('permission-error', contextualError);
         setLocalError('Failed to submit your question. Please try again.');
-      })
-      .finally(() => {
-        setIsSubmitting(false);
-      });
+        console.error("Submission error:", e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleUpvote = (questionId: string) => {
+  const handleUpvote = async (questionId: string) => {
     if (!user || !firestore) return;
+
     const question = questions?.find((q) => q.id === questionId);
     if (!question || question.upvotedBy.includes(user.uid)) {
-      return; // Already upvoted
+      return; // Already upvoted or question not found
     }
 
     const questionRef = doc(firestore, 'sessions', sessionId, 'questions', questionId);
-    updateDocumentNonBlocking(questionRef, {
-      upvotes: increment(1),
-      upvotedBy: arrayUnion(user.uid),
-    }).catch(e => {
+    
+    try {
+        await updateDoc(questionRef, {
+            upvotes: increment(1),
+            upvotedBy: arrayUnion(user.uid),
+        });
+    } catch (e: any) {
+        const contextualError = new FirestorePermissionError({
+            path: questionRef.path,
+            operation: 'update',
+            requestResourceData: { upvotes: 'increment(1)' },
+        });
+        errorEmitter.emit('permission-error', contextualError);
         console.error("Upvote error:", e);
         // Optionally show an error to the user that upvote failed
-    });
+    }
   };
 
-  const isComponentLoading = isUserLoading || isLoadingQuestions;
+  const isComponentLoading = isUserLoading || (isLoadingQuestions && !questions);
 
   return (
     <Card className="mt-8 bg-muted/20 border-t-4 border-primary/50 shadow-lg">
@@ -134,11 +142,11 @@ export function QandA({ sessionId }: { sessionId: string }) {
         <div className="flex gap-2 mb-6">
           <Input
             type="text"
-            placeholder={user ? "Type your question here..." : "Loading..."}
+            placeholder={user ? "Type your question here..." : "Authenticating..."}
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
             disabled={isSubmitting || !user}
-            onKeyDown={(e) => e.key === 'Enter' && handleQuestionSubmit()}
+            onKeyDown={(e) => e.key === 'Enter' && !isSubmitting && handleQuestionSubmit()}
           />
           <Button
             onClick={handleQuestionSubmit}
@@ -160,7 +168,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
           </Alert>
         )}
 
-        {isComponentLoading && !questions ? (
+        {isComponentLoading ? (
             <div className="flex items-center justify-center h-24">
                 <Loader2 className="animate-spin text-primary" />
             </div>
@@ -199,7 +207,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
                         <span>{q.author}</span>
                         {q.timestamp?.toDate && (
                             <span>
-                                {q.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(q.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         )}
                     </div>
