@@ -1,23 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  useFirestore,
-  useUser,
-  useMemoFirebase,
-  useCollection,
-} from '@/firebase';
-import {
-  addDoc,
-  updateDoc,
-  collection,
-  query,
-  orderBy,
-  doc,
-  serverTimestamp,
-  increment,
-  arrayUnion,
-} from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,102 +14,124 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUser } from '@/firebase/auth/use-user';
+
 
 interface Question {
   id: string;
   text: string;
   author: string;
   upvotes: number;
-  timestamp: any;
-  upvotedBy: string[];
+  timestamp: number;
+  upvotedBy: string[]; // Using a placeholder for user id, could be a generated client id
 }
 
-export function QandA({ sessionId }: { sessionId: string }) {
+export function QandA({ sessionId }: { sessionId:string }) {
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [newQuestion, setNewQuestion] = useState('');
   const [postAnonymously, setPostAnonymously] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-
-  const questionsRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'sessions', sessionId, 'questions');
-  }, [firestore, sessionId]);
   
-  const questionsQuery = useMemoFirebase(() => {
-    if (!questionsRef) return null;
-    return query(questionsRef, orderBy('upvotes', 'desc'), orderBy('timestamp', 'desc'));
-  }, [questionsRef]);
+  // We can still use the user hook to get display name if available
+  const { user } = useUser();
+  const [clientId, setClientId] = useState('');
 
-  const { data: questions, isLoading: isLoadingQuestions, error: questionsError } = useCollection<Question>(questionsQuery);
+  useEffect(() => {
+    // Generate or retrieve a simple client ID for anonymous voting
+    let id = localStorage.getItem('qa_client_id');
+    if (!id) {
+      id = `client_${Date.now()}_${Math.random()}`;
+      localStorage.setItem('qa_client_id', id);
+    }
+    setClientId(id);
+
+    try {
+      setIsLoading(true);
+      const storageKey = `questions_${sessionId}`;
+      const storedQuestions = localStorage.getItem(storageKey);
+      if (storedQuestions) {
+        const parsedQuestions: Question[] = JSON.parse(storedQuestions);
+        // Sort questions by upvotes and timestamp
+        parsedQuestions.sort((a, b) => {
+          if (b.upvotes !== a.upvotes) {
+            return b.upvotes - a.upvotes;
+          }
+          return b.timestamp - a.timestamp;
+        });
+        setQuestions(parsedQuestions);
+      }
+    } catch (e) {
+      console.error("Failed to load questions from local storage", e);
+      setLocalError("Could not load questions from your browser's storage.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  const saveQuestionsToLocalStorage = (updatedQuestions: Question[]) => {
+    try {
+      const storageKey = `questions_${sessionId}`;
+      localStorage.setItem(storageKey, JSON.stringify(updatedQuestions));
+    } catch (e) {
+      console.error("Failed to save questions to local storage", e);
+      setLocalError("Could not save your action. Your browser's storage might be full.");
+    }
+  };
 
   const handleQuestionSubmit = async () => {
-    if (!newQuestion.trim() || !user || !firestore || !questionsRef) {
-      return;
-    }
+    if (!newQuestion.trim()) return;
+
     setIsSubmitting(true);
     setLocalError(null);
 
-    const questionData = {
+    // Simulate async operation
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    const questionData: Question = {
+      id: `${Date.now()}`,
       text: newQuestion,
-      author: postAnonymously ? 'Anonymous' : user.displayName || 'Anonymous',
-      authorId: user.uid,
+      author: postAnonymously ? 'Anonymous' : (user?.displayName || 'Anonymous Attendee'),
       upvotes: 0,
-      timestamp: serverTimestamp(),
+      timestamp: Date.now(),
       upvotedBy: [],
     };
     
-    try {
-      await addDoc(questionsRef, questionData);
-      setNewQuestion('');
-      setPostAnonymously(false);
-    } catch (e: any) {
-        const contextualError = new FirestorePermissionError({
-            path: questionsRef.path,
-            operation: 'create',
-            requestResourceData: questionData,
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        setLocalError('Failed to submit your question. Please check your permissions and try again.');
-        console.error("Submission error:", e);
-    } finally {
-      setIsSubmitting(false);
-    }
+    const updatedQuestions = [questionData, ...questions];
+    setQuestions(updatedQuestions);
+    saveQuestionsToLocalStorage(updatedQuestions);
+
+    setNewQuestion('');
+    setPostAnonymously(false);
+    setIsSubmitting(false);
   };
 
-  const handleUpvote = async (questionId: string) => {
-    if (!user || !firestore) return;
-
-    const question = questions?.find((q) => q.id === questionId);
-    if (!question || question.upvotedBy.includes(user.uid)) {
-      return; // Already upvoted or question not found
+  const handleUpvote = (questionId: string) => {
+    const question = questions.find((q) => q.id === questionId);
+    // Use the generated clientId for upvote tracking
+    if (!question || question.upvotedBy.includes(clientId)) {
+      return; 
     }
 
-    const questionRef = doc(firestore, 'sessions', sessionId, 'questions', questionId);
-    
-    try {
-        await updateDoc(questionRef, {
-            upvotes: increment(1),
-            upvotedBy: arrayUnion(user.uid),
-        });
-    } catch (e: any) {
-        const contextualError = new FirestorePermissionError({
-            path: questionRef.path,
-            operation: 'update',
-            requestResourceData: { upvotes: 'increment(1)' },
-        });
-        errorEmitter.emit('permission-error', contextualError);
-        console.error("Upvote error:", e);
-        // Optionally show an error to the user that upvote failed
-    }
+    const updatedQuestions = questions.map(q => 
+      q.id === questionId 
+        ? { ...q, upvotes: q.upvotes + 1, upvotedBy: [...q.upvotedBy, clientId] }
+        : q
+    );
+
+    // Re-sort after upvoting
+    updatedQuestions.sort((a, b) => {
+      if (b.upvotes !== a.upvotes) {
+        return b.upvotes - a.upvotes;
+      }
+      return b.timestamp - a.timestamp;
+    });
+
+    setQuestions(updatedQuestions);
+    saveQuestionsToLocalStorage(updatedQuestions);
   };
-
-  const isComponentLoading = isUserLoading || (isLoadingQuestions && !questions);
 
   return (
     <Card className="mt-8 bg-muted/20 border-t-4 border-primary/50 shadow-lg">
@@ -144,15 +149,15 @@ export function QandA({ sessionId }: { sessionId: string }) {
           <div className="flex gap-2">
             <Input
               type="text"
-              placeholder={user ? "Type your question here..." : "Authenticating..."}
+              placeholder="Type your question here..."
               value={newQuestion}
               onChange={(e) => setNewQuestion(e.target.value)}
-              disabled={isSubmitting || !user}
+              disabled={isSubmitting}
               onKeyDown={(e) => e.key === 'Enter' && !isSubmitting && handleQuestionSubmit()}
             />
             <Button
               onClick={handleQuestionSubmit}
-              disabled={isSubmitting || !newQuestion.trim() || !user}
+              disabled={isSubmitting || !newQuestion.trim()}
             >
               {isSubmitting ? (
                 <Loader2 className="animate-spin" />
@@ -167,7 +172,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
               id="anonymous"
               checked={postAnonymously}
               onCheckedChange={(checked) => setPostAnonymously(checked as boolean)}
-              disabled={isSubmitting || !user}
+              disabled={isSubmitting}
             />
             <Label
               htmlFor="anonymous"
@@ -178,22 +183,21 @@ export function QandA({ sessionId }: { sessionId: string }) {
           </div>
         </div>
 
-        {(localError || questionsError) && (
+        {localError && (
           <Alert variant="destructive" className="mb-4">
              <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{localError || 'Could not load questions.'}</AlertDescription>
+            <AlertDescription>{localError}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-4">
-          {isComponentLoading ? (
+          {isLoading ? (
              <div className="space-y-4">
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
              </div>
-          ) : questions && questions.length > 0 ? (
+          ) : questions.length > 0 ? (
             questions.map((question) => (
               <div key={question.id} className="flex items-start gap-4 p-4 rounded-lg bg-background/60 border">
                 <div className="flex flex-col items-center">
@@ -201,7 +205,7 @@ export function QandA({ sessionId }: { sessionId: string }) {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleUpvote(question.id)}
-                        disabled={!user || question.upvotedBy.includes(user.uid)}
+                        disabled={question.upvotedBy.includes(clientId)}
                         className="flex flex-col h-auto px-2 py-1 text-primary disabled:text-muted-foreground hover:text-primary/80"
                     >
                         <ThumbsUp className="h-5 w-5" />
