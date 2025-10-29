@@ -1,67 +1,66 @@
-import { KpiSection } from "@/components/dashboard/kpi-section";
-import { AgendaList } from "@/components/dashboard/agenda-list";
-import { CompositionChart } from "@/components/dashboard/composition-chart";
-import { SpeakerChart } from "@/components/dashboard/speaker-chart";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { SpeakerGrid } from "@/components/dashboard/speaker-grid";
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Calendar, Users } from 'lucide-react';
+import { Header } from '@/components/dashboard/header';
 
-export default function Home() {
+export default function HomePage() {
   return (
     <>
-      <KpiSection />
-
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <Card className="shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-foreground mb-2 border-b pb-2">Interactive Seminar Agenda</CardTitle>
-              <CardDescription>
-                Click any session to toggle its detailed timing breakdown, or use the "Details" button for a dedicated summary page.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AgendaList />
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-1 space-y-8">
-          <Card className="shadow-xl">
-            <CardHeader>
-                <CardTitle className="text-xl font-bold text-foreground mb-2 border-b pb-2">Expert Speakers</CardTitle>
-                <CardDescription>Click a speaker to view their profile and sessions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <SpeakerGrid />
-            </CardContent>
-          </Card>
-          <Card className="shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-foreground mb-2 border-b pb-2">Total Program Composition</CardTitle>
-              <CardDescription>A breakdown of the 6 hours of structured session time.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-72">
-                <CompositionChart />
+      <Header />
+      <main className="flex-1">
+        <section className="py-24 md:py-32 text-center">
+          <div className="container px-4 md:px-6">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tighter mb-4">
+                Welcome to the Leadership Summit Navigator
+              </h2>
+              <p className="text-xl text-muted-foreground mb-8">
+                Your interactive guide to the premier leadership training event of the year.
+              </p>
+              <div className="flex justify-center gap-4">
+                <Button asChild size="lg">
+                  <Link href="/dashboard">
+                    View Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <Link href="/dashboard">
+                    Explore Sessions <Calendar className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-
-      <section className="mt-8">
-        <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-foreground mb-2 border-b pb-2">Speaker Content Allocation</CardTitle>
-            <CardDescription>Minutes of content delivery per expert speaker.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80 max-h-96">
-                <SpeakerChart />
             </div>
-          </CardContent>
-        </Card>
-      </section>
+          </div>
+        </section>
+
+        <section className="bg-muted py-20">
+            <div className="container px-4 md:px-6">
+                <div className="grid md:grid-cols-3 gap-12 text-center">
+                    <div className="flex flex-col items-center">
+                        <Users className="h-12 w-12 text-primary mb-4" />
+                        <h3 className="text-2xl font-bold text-foreground mb-2">Expert Speakers</h3>
+                        <p className="text-muted-foreground">
+                            Learn from seasoned leaders and visionaries in church growth and management.
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <Calendar className="h-12 w-12 text-primary mb-4" />
+                        <h3 className="text-2xl font-bold text-foreground mb-2">Interactive Agenda</h3>
+                        <p className="text-muted-foreground">
+                            Engage with a dynamic schedule, session details, and live Q&A.
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <ArrowRight className="h-12 w-12 text-primary mb-4" />
+                        <h3 className="text-2xl font-bold text-foreground mb-2">Actionable Insights</h3>
+                        <p className="text-muted-foreground">
+                            Gain practical strategies to implement in your ministry immediately.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+      </main>
     </>
   );
 }

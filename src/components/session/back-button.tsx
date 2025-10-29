@@ -11,7 +11,7 @@ export default function BackButton() {
     <Button
       variant="outline"
       className="bg-white hover:bg-gray-100 text-gray-700 shadow-md"
-      onClick={() => router.push("/")}
+      onClick={() => router.push("/dashboard")}
     >
       <ArrowLeft className="w-4 h-4 mr-2" />
       Back to Dashboard
