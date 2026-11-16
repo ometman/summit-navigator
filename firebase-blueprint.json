@@ -1,0 +1,1549 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Summit Navigator attendee profile verified via Google Sign-In and Email OTP MFA.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Attendee full name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email address.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "organization": {
+          "type": "string",
+          "description": "Church or ministry organization.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Ministry role.",
+          "enum": [
+            "Senior Pastor",
+            "Ministry Lead",
+            "Operations & Strategy",
+            "Youth & Outreach",
+            "Volunteer Coordinator"
+          ]
+        },
+        "track": {
+          "type": "string",
+          "description": "Selected summit session track.",
+          "enum": [
+            "Morning & Afternoon",
+            "Morning Track",
+            "Afternoon Track"
+          ]
+        },
+        "mfaMethod": {
+          "type": "string",
+          "description": "Multi-factor authentication method used.",
+          "enum": [
+            "email_otp"
+          ]
+        },
+        "mfaVerifiedAt": {
+          "type": "string",
+          "description": "ISO timestamp of most recent Email OTP verification.",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was last updated."
+        }
+      },
+      "required": [
+        "uid",
+        "fullName",
+        "email",
+        "organization",
+        "role",
+        "track",
+        "mfaMethod",
+        "mfaVerifiedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SessionQuestion": {
+      "title": "SessionQuestion",
+      "description": "Real-time audience question posted to a summit session with speaker moderation flags and atomic upvote counter.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Firestore document ID for the question.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Identifier of the summit session this question belongs to.",
+          "enum": ["1", "2", "3", "4", "5", "6"]
+        },
+        "text": {
+          "type": "string",
+          "description": "Audience question text.",
+          "minLength": 3,
+          "maxLength": 500
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the submitting attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Public display label for the question author or Anonymous.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "isAnonymous": {
+          "type": "boolean",
+          "description": "Whether the attendee chose to hide their name publicly."
+        },
+        "upvotesCount": {
+          "type": "integer",
+          "description": "Synchronized count of attendee upvotes."
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "Speaker/moderator pin flag to highlight priority questions."
+        },
+        "answered": {
+          "type": "boolean",
+          "description": "Speaker/moderator status indicating the question has been addressed."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Speaker/moderator flag hiding resolved or off-topic questions from the active feed."
+        },
+        "moderatedBy": {
+          "type": "string",
+          "description": "UID of the speaker or moderator who last changed moderation flags, or empty string if unmoderated.",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the question was submitted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest upvote or moderation update."
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "text",
+        "authorId",
+        "authorName",
+        "isAnonymous",
+        "upvotesCount",
+        "pinned",
+        "answered",
+        "archived",
+        "moderatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "QuestionUpvote": {
+      "title": "QuestionUpvote",
+      "description": "Per-user upvote marker ensuring one upvote per verified attendee per question via deterministic document IDs.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the attendee who upvoted.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Identifier of the summit session.",
+          "enum": ["1", "2", "3", "4", "5", "6"]
+        },
+        "questionId": {
+          "type": "string",
+          "description": "Identifier of the upvoted question document.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the upvote was recorded."
+        }
+      },
+      "required": [
+        "uid",
+        "sessionId",
+        "questionId",
+        "createdAt"
+      ]
+    },
+    "Moderator": {
+      "title": "Moderator",
+      "description": "Assigned speaker or moderator record granting live Q&A moderation privileges.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the assigned speaker or moderator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Public speaker or moderator label.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "description": "Moderation or organizer admin role assigned.",
+          "enum": ["speaker", "moderator", "admin"]
+        },
+        "grantedBy": {
+          "type": "string",
+          "description": "Firebase Auth UID of the administrator who granted moderation access.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when moderation access was granted."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "role",
+        "grantedBy",
+        "createdAt"
+      ]
+    },
+    "AttendeePass": {
+      "title": "AttendeePass",
+      "description": "Signed digital QR credential and real-time on-site check-in state for an MFA-verified summit attendee.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "passCode": {
+          "type": "string",
+          "description": "Short human-readable summit badge identifier.",
+          "minLength": 6,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Attendee full name printed on the digital pass.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified attendee Google email address.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "organization": {
+          "type": "string",
+          "description": "Church or ministry organization.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Ministry role.",
+          "enum": [
+            "Senior Pastor",
+            "Ministry Lead",
+            "Operations & Strategy",
+            "Youth & Outreach",
+            "Volunteer Coordinator"
+          ]
+        },
+        "track": {
+          "type": "string",
+          "description": "Selected summit session track.",
+          "enum": [
+            "Morning & Afternoon",
+            "Morning Track",
+            "Afternoon Track"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "description": "Real-time check-in status.",
+          "enum": [
+            "Confirmed",
+            "Checked In"
+          ]
+        },
+        "checkInMethod": {
+          "type": "string",
+          "description": "How arrival check-in was confirmed.",
+          "enum": [
+            "none",
+            "self_checkin",
+            "organizer_scan"
+          ]
+        },
+        "checkedInBy": {
+          "type": "string",
+          "description": "UID of attendee or organizer who recorded check-in, or empty string if Confirmed.",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "checkedInAt": {
+          "type": "string",
+          "description": "ISO timestamp of check-in, or empty string if Confirmed.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "mfaVerifiedAt": {
+          "type": "string",
+          "description": "ISO timestamp of Email OTP verification backing the QR pass.",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "qrSignatureDigest": {
+          "type": "string",
+          "description": "Cryptographic digest fingerprint of the server-signed QR pass token.",
+          "minLength": 8,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when pass was provisioned."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when pass status or metadata last changed."
+        }
+      },
+      "required": [
+        "uid",
+        "passCode",
+        "fullName",
+        "email",
+        "organization",
+        "role",
+        "track",
+        "status",
+        "checkInMethod",
+        "checkedInBy",
+        "checkedInAt",
+        "mfaVerifiedAt",
+        "qrSignatureDigest",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SessionPoll": {
+      "title": "SessionPoll",
+      "description": "Real-time speaker-launched multiple-choice poll or 1-tap commitment prompt with live aggregate option counts.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Firestore document ID for the poll.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Summit session identifier.",
+          "enum": ["1", "2", "3", "4", "5", "6"]
+        },
+        "pollType": {
+          "type": "string",
+          "description": "Distinguishes multi-option polls from 1-tap commitment/sentiment prompts.",
+          "enum": ["multiple_choice", "commitment"]
+        },
+        "question": {
+          "type": "string",
+          "description": "Prompt or question presented by the speaker.",
+          "minLength": 3,
+          "maxLength": 240
+        },
+        "options": {
+          "type": "array",
+          "description": "Bounded list of 2 to 5 selectable response labels."
+        },
+        "optionCount": {
+          "type": "integer",
+          "description": "Exact number of active choices (2 to 5)."
+        },
+        "count0": {
+          "type": "integer",
+          "description": "Aggregate response count for option index 0."
+        },
+        "count1": {
+          "type": "integer",
+          "description": "Aggregate response count for option index 1."
+        },
+        "count2": {
+          "type": "integer",
+          "description": "Aggregate response count for option index 2."
+        },
+        "count3": {
+          "type": "integer",
+          "description": "Aggregate response count for option index 3."
+        },
+        "count4": {
+          "type": "integer",
+          "description": "Aggregate response count for option index 4."
+        },
+        "totalVotes": {
+          "type": "integer",
+          "description": "Total verified attendee responses recorded on this poll."
+        },
+        "status": {
+          "type": "string",
+          "description": "Live voting status controlled by speakers/moderators.",
+          "enum": ["open", "closed"]
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether the speaker/moderator archived this poll from active session view."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Firebase Auth UID of the speaker/moderator who launched the poll.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdByName": {
+          "type": "string",
+          "description": "Public speaker or moderator display label.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the poll was launched."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest vote or status update."
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "pollType",
+        "question",
+        "options",
+        "optionCount",
+        "count0",
+        "count1",
+        "count2",
+        "count3",
+        "count4",
+        "totalVotes",
+        "status",
+        "archived",
+        "createdBy",
+        "createdByName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PollVote": {
+      "title": "PollVote",
+      "description": "Deterministic per-user poll response marker keyed by {pollId}_{uid} ensuring one vote per verified attendee.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the responding attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Summit session identifier.",
+          "enum": ["1", "2", "3", "4", "5", "6"]
+        },
+        "pollId": {
+          "type": "string",
+          "description": "Identifier of the answered poll document.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "optionIndex": {
+          "type": "integer",
+          "description": "Zero-based index of the chosen poll option (0 to 4)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the vote was cast."
+        }
+      },
+      "required": [
+        "uid",
+        "sessionId",
+        "pollId",
+        "optionIndex",
+        "createdAt"
+      ]
+    },
+    "DirectoryProfile": {
+      "title": "DirectoryProfile",
+      "description": "Opt-in verified leadership and speaker networking profile discoverable by ministry role and session track (PII-free).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the opted-in member.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Public display name in the leadership directory.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "organization": {
+          "type": "string",
+          "description": "Church, ministry, or organization name.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Ministry role used for directory filtering.",
+          "enum": [
+            "Senior Pastor",
+            "Ministry Lead",
+            "Operations & Strategy",
+            "Youth & Outreach",
+            "Volunteer Coordinator"
+          ]
+        },
+        "track": {
+          "type": "string",
+          "description": "Summit session track preference.",
+          "enum": [
+            "Morning & Afternoon",
+            "Morning Track",
+            "Afternoon Track"
+          ]
+        },
+        "memberType": {
+          "type": "string",
+          "description": "Indicates whether the opted-in profile is an attendee or verified speaker/moderator.",
+          "enum": ["attendee", "speaker"]
+        },
+        "bio": {
+          "type": "string",
+          "description": "Brief ministry focus or collaboration bio.",
+          "minLength": 0,
+          "maxLength": 280
+        },
+        "focusTopics": {
+          "type": "array",
+          "description": "Up to 5 short ministry focus topics."
+        },
+        "optedIn": {
+          "type": "boolean",
+          "description": "Explicit user opt-in controlling directory visibility."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the directory profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest opt-in or profile update."
+        }
+      },
+      "required": [
+        "uid",
+        "fullName",
+        "organization",
+        "role",
+        "track",
+        "memberType",
+        "bio",
+        "focusTopics",
+        "optedIn",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DirectoryConnection": {
+      "title": "DirectoryConnection",
+      "description": "Cross-organization peer or attendee-to-speaker connection introduction between opted-in directory members.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Deterministic connection ID formatted as {senderUid}_{recipientUid}.",
+          "minLength": 3,
+          "maxLength": 260,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the leader initiating the connection.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Sender full name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "senderOrg": {
+          "type": "string",
+          "description": "Sender church or organization.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "senderRole": {
+          "type": "string",
+          "description": "Sender ministry role.",
+          "enum": [
+            "Senior Pastor",
+            "Ministry Lead",
+            "Operations & Strategy",
+            "Youth & Outreach",
+            "Volunteer Coordinator"
+          ]
+        },
+        "recipientUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the opted-in directory recipient.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recipientName": {
+          "type": "string",
+          "description": "Recipient full name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "recipientOrg": {
+          "type": "string",
+          "description": "Recipient church or organization.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "recipientRole": {
+          "type": "string",
+          "description": "Recipient ministry role.",
+          "enum": [
+            "Senior Pastor",
+            "Ministry Lead",
+            "Operations & Strategy",
+            "Youth & Outreach",
+            "Volunteer Coordinator"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "description": "Short cross-organization introduction note.",
+          "minLength": 3,
+          "maxLength": 300
+        },
+        "replyNote": {
+          "type": "string",
+          "description": "Optional reply or preferred contact note shared by the recipient upon accepting.",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "status": {
+          "type": "string",
+          "description": "Connection request status.",
+          "enum": ["pending", "accepted", "declined"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the connection request was sent."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the connection status changed."
+        }
+      },
+      "required": [
+        "id",
+        "senderUid",
+        "senderName",
+        "senderOrg",
+        "senderRole",
+        "recipientUid",
+        "recipientName",
+        "recipientOrg",
+        "recipientRole",
+        "message",
+        "replyNote",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SessionOverride": {
+      "title": "SessionOverride",
+      "description": "Admin-managed live overrides for summit session times, duration allocations, slide decks, and downloadable study packets.",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "Summit session identifier.",
+          "enum": ["1", "2", "3", "4", "5", "6"]
+        },
+        "time": {
+          "type": "string",
+          "description": "Scheduled time window label for the session.",
+          "minLength": 3,
+          "maxLength": 80
+        },
+        "title": {
+          "type": "string",
+          "description": "Session display title.",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "speaker": {
+          "type": "string",
+          "description": "Assigned speaker display name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "content": {
+          "type": "integer",
+          "description": "Teaching duration in minutes."
+        },
+        "qa": {
+          "type": "integer",
+          "description": "Q&A duration in minutes."
+        },
+        "prayer": {
+          "type": "integer",
+          "description": "Prayer and transition duration in minutes."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Session overview and abstract.",
+          "minLength": 10,
+          "maxLength": 2000
+        },
+        "studyPacketTitle": {
+          "type": "string",
+          "description": "Title of the downloadable study packet.",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "studyPacketNotes": {
+          "type": "string",
+          "description": "Organizer study packet notes, discussion prompts, and action steps included in downloads.",
+          "minLength": 0,
+          "maxLength": 4000
+        },
+        "slides": {
+          "type": "array",
+          "description": "Bounded list of up to 8 presentation slide objects."
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Firebase Auth UID of the organizer or speaker who last edited this session.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when session override was first saved."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when session content was last edited."
+        }
+      },
+      "required": [
+        "sessionId",
+        "time",
+        "title",
+        "speaker",
+        "content",
+        "qa",
+        "prayer",
+        "summary",
+        "studyPacketTitle",
+        "studyPacketNotes",
+        "slides",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SpeakerOverride": {
+      "title": "SpeakerOverride",
+      "description": "Admin-managed speaker role and biography updates synced across speaker profiles and directory cards.",
+      "type": "object",
+      "properties": {
+        "speakerKey": {
+          "type": "string",
+          "description": "URL-safe slug key identifying the summit speaker.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Speaker display name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "description": "Speaker title or ministry specialty.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "bio": {
+          "type": "string",
+          "description": "Speaker biography text.",
+          "minLength": 10,
+          "maxLength": 2000
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Firebase Auth UID of the admin or speaker who updated this bio.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when speaker override was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when speaker bio was updated."
+        }
+      },
+      "required": [
+        "speakerKey",
+        "name",
+        "role",
+        "bio",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RegistrationRecord": {
+      "title": "RegistrationRecord",
+      "description": "Organizer-managed attendee registration record supporting single and bulk approval workflows.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Registration document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Attendee full name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Attendee email address.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "organization": {
+          "type": "string",
+          "description": "Church or organization name.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Ministry role.",
+          "enum": [
+            "Senior Pastor",
+            "Ministry Lead",
+            "Operations & Strategy",
+            "Youth & Outreach",
+            "Volunteer Coordinator"
+          ]
+        },
+        "track": {
+          "type": "string",
+          "description": "Summit track selection.",
+          "enum": [
+            "Morning & Afternoon",
+            "Morning Track",
+            "Afternoon Track"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "description": "Registration channel.",
+          "enum": [
+            "Web Registration",
+            "Direct Invite",
+            "Ministry Partner"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "description": "Approval or check-in status.",
+          "enum": [
+            "Confirmed",
+            "Pending Verification",
+            "Checked In"
+          ]
+        },
+        "registeredAt": {
+          "type": "string",
+          "description": "ISO timestamp when attendee registered.",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID of organizer who last approved or modified status, or empty string on initial signup.",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when record was stored in Firestore."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest status or bulk approval update."
+        }
+      },
+      "required": [
+        "id",
+        "fullName",
+        "email",
+        "organization",
+        "role",
+        "track",
+        "source",
+        "status",
+        "registeredAt",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ActionPlanItem": {
+      "title": "ActionPlanItem",
+      "description": "Interactive 30/60/90-day post-summit action checklist item assigned to an attendee's church and ministry department.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Firestore document ID for the action checklist item.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Summit session identifier from which this takeaway originates.",
+          "enum": ["1", "2", "3", "4", "5", "6"]
+        },
+        "sessionTitle": {
+          "type": "string",
+          "description": "Display title of the originating summit session.",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "title": {
+          "type": "string",
+          "description": "Actionable ministry milestone task.",
+          "minLength": 3,
+          "maxLength": 220
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional implementation steps or Scripture anchor.",
+          "minLength": 0,
+          "maxLength": 600
+        },
+        "horizonDays": {
+          "type": "integer",
+          "description": "Target implementation horizon in days post-summit (30, 60, or 90)."
+        },
+        "churchName": {
+          "type": "string",
+          "description": "Assigned church or ministry organization.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "department": {
+          "type": "string",
+          "description": "Assigned ministry department or functional team.",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "assigneeLabel": {
+          "type": "string",
+          "description": "Lead person or role responsible for follow-through.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "description": "Checklist execution status.",
+          "enum": ["pending", "in_progress", "completed"]
+        },
+        "dueDateIso": {
+          "type": "string",
+          "description": "Target YYYY-MM-DD due date computed from summit baseline and horizon.",
+          "minLength": 10,
+          "maxLength": 32
+        },
+        "completedAtIso": {
+          "type": "string",
+          "description": "ISO timestamp when marked completed, or empty string if active.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when action item was added."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest status or assignment update."
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "sessionId",
+        "sessionTitle",
+        "title",
+        "notes",
+        "horizonDays",
+        "churchName",
+        "department",
+        "assigneeLabel",
+        "status",
+        "dueDateIso",
+        "completedAtIso",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ActionReminderPreference": {
+      "title": "ActionReminderPreference",
+      "description": "Profile-synced progress reminder cadence, default church/department assignment, and 30/60/90-day baseline date.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether scheduled accountability progress reminders are active."
+        },
+        "cadence": {
+          "type": "string",
+          "description": "Frequency of ministry accountability check-in reminders.",
+          "enum": ["weekly", "biweekly", "monthly"]
+        },
+        "reminderDay": {
+          "type": "string",
+          "description": "Preferred day of the week for accountability review.",
+          "enum": ["Monday", "Wednesday", "Friday", "Saturday"]
+        },
+        "preferredChannel": {
+          "type": "string",
+          "description": "Delivery surface for accountability reminders.",
+          "enum": ["email_digest", "dashboard_banner", "both"]
+        },
+        "churchName": {
+          "type": "string",
+          "description": "Church or organization name synced with attendee profile.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "defaultDepartment": {
+          "type": "string",
+          "description": "Primary ministry department for new action items.",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "summitDateIso": {
+          "type": "string",
+          "description": "YYYY-MM-DD summit completion date anchoring 30/60/90-day targets.",
+          "minLength": 10,
+          "maxLength": 32
+        },
+        "lastCheckInIso": {
+          "type": "string",
+          "description": "ISO timestamp of most recent accountability check-in, or empty string.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when reminder settings were initialized."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest reminder preference update."
+        }
+      },
+      "required": [
+        "uid",
+        "enabled",
+        "cadence",
+        "reminderDay",
+        "preferredChannel",
+        "churchName",
+        "defaultDepartment",
+        "summitDateIso",
+        "lastCheckInIso",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ReminderSubscription": {
+      "title": "ReminderSubscription",
+      "description": "Scheduled outbound email digest subscription synced with each attendee's 30/60/90-day action plan progress and cadence.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the subscribed attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified attendee email address receiving scheduled digests.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Attendee full name for email personalization.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether automated reminder dispatches are active."
+        },
+        "cadence": {
+          "type": "string",
+          "description": "Frequency of automated reminder dispatches.",
+          "enum": ["weekly", "biweekly", "monthly"]
+        },
+        "reminderDay": {
+          "type": "string",
+          "description": "Preferred day of the week for email digest delivery.",
+          "enum": ["Monday", "Wednesday", "Friday", "Saturday"]
+        },
+        "preferredChannel": {
+          "type": "string",
+          "description": "Preferred reminder delivery surface.",
+          "enum": ["email_digest", "dashboard_banner", "both"]
+        },
+        "churchName": {
+          "type": "string",
+          "description": "Assigned church or ministry organization.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "defaultDepartment": {
+          "type": "string",
+          "description": "Primary ministry department for the attendee.",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "summitDateIso": {
+          "type": "string",
+          "description": "Anchor summit date (YYYY-MM-DD).",
+          "minLength": 10,
+          "maxLength": 32
+        },
+        "lastCheckInIso": {
+          "type": "string",
+          "description": "ISO timestamp of latest manual accountability check-in.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "lastEmailedAtIso": {
+          "type": "string",
+          "description": "ISO timestamp of most recent outbound digest email.",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "nextDueAtIso": {
+          "type": "string",
+          "description": "Next scheduled digest date (YYYY-MM-DD).",
+          "minLength": 10,
+          "maxLength": 32
+        },
+        "openCount": {
+          "type": "integer",
+          "description": "Count of open/in-progress milestones."
+        },
+        "completedCount": {
+          "type": "integer",
+          "description": "Count of completed milestones."
+        },
+        "overdueCount": {
+          "type": "integer",
+          "description": "Count of overdue incomplete milestones."
+        },
+        "dueSoonCount": {
+          "type": "integer",
+          "description": "Count of incomplete milestones due within 14 days."
+        },
+        "topOpenTitles": {
+          "type": "array",
+          "description": "Bounded preview of up to 5 top open action items for offline email digests."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when subscription was initialized."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest sync or cron dispatch."
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "enabled",
+        "cadence",
+        "reminderDay",
+        "preferredChannel",
+        "churchName",
+        "defaultDepartment",
+        "summitDateIso",
+        "lastCheckInIso",
+        "lastEmailedAtIso",
+        "nextDueAtIso",
+        "openCount",
+        "completedCount",
+        "overdueCount",
+        "dueSoonCount",
+        "topOpenTitles",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ReminderDispatchLog": {
+      "title": "ReminderDispatchLog",
+      "description": "Immutable outbound digest delivery audit log recorded by scheduled cron runs, admin batches, or user test sends.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Firestore document ID for the dispatch log.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the recipient attendee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recipientEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address targeted by this dispatch.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "recipientName": {
+          "type": "string",
+          "description": "Recipient full name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "churchName": {
+          "type": "string",
+          "description": "Assigned church or organization name.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "cadence": {
+          "type": "string",
+          "description": "Cadence active when the digest ran.",
+          "enum": ["weekly", "biweekly", "monthly"]
+        },
+        "triggerSource": {
+          "type": "string",
+          "description": "Source that initiated the email dispatch.",
+          "enum": ["cron_scheduler", "admin_console", "user_test"]
+        },
+        "deliveryMode": {
+          "type": "string",
+          "description": "Email transport used during dispatch.",
+          "enum": ["resend", "smtp", "preview"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Outcome of the dispatch attempt.",
+          "enum": ["sent", "preview", "failed", "skipped"]
+        },
+        "openCount": {
+          "type": "integer",
+          "description": "Open milestones included in the digest."
+        },
+        "overdueCount": {
+          "type": "integer",
+          "description": "Overdue milestones included in the digest."
+        },
+        "dueSoonCount": {
+          "type": "integer",
+          "description": "Due-soon milestones included in the digest."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject line dispatched.",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "sentAtIso": {
+          "type": "string",
+          "description": "ISO timestamp when dispatch executed.",
+          "minLength": 10,
+          "maxLength": 64
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "Failure reason if status is failed, otherwise empty string.",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when dispatch log was created."
+        }
+      },
+      "required": [
+        "id",
+        "uid",
+        "recipientEmail",
+        "recipientName",
+        "churchName",
+        "cadence",
+        "triggerSource",
+        "deliveryMode",
+        "status",
+        "openCount",
+        "overdueCount",
+        "dueSoonCount",
+        "subject",
+        "sentAtIso",
+        "errorMessage",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores verified attendee profile data scoped strictly to the owning authenticated user."
+    },
+    "/attendeePasses/{userId}": {
+      "schema": {
+        "$ref": "#/entities/AttendeePass"
+      },
+      "description": "Real-time digital QR badge credentials and Confirmed/Checked In status per MFA-verified attendee."
+    },
+    "/moderators/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Moderator"
+      },
+      "description": "Stores speaker, moderator, and admin role assignments managed by the bootstrapped summit administrator."
+    },
+    "/sessions/{sessionId}/questions/{questionId}": {
+      "schema": {
+        "$ref": "#/entities/SessionQuestion"
+      },
+      "description": "Real-time shared audience questions for each summit session with moderation flags and upvote counts."
+    },
+    "/sessions/{sessionId}/upvotes/{upvoteId}": {
+      "schema": {
+        "$ref": "#/entities/QuestionUpvote"
+      },
+      "description": "Deterministic per-user upvote documents keyed by {questionId}_{uid} synchronized atomically with SessionQuestion.upvotesCount."
+    },
+    "/sessions/{sessionId}/polls/{pollId}": {
+      "schema": {
+        "$ref": "#/entities/SessionPoll"
+      },
+      "description": "Real-time multiple-choice polls and 1-tap commitment prompts with aggregate response counts."
+    },
+    "/sessions/{sessionId}/pollVotes/{voteId}": {
+      "schema": {
+        "$ref": "#/entities/PollVote"
+      },
+      "description": "Deterministic per-user vote receipts keyed by {pollId}_{uid} paired atomically with SessionPoll option counts."
+    },
+    "/directoryProfiles/{userId}": {
+      "schema": {
+        "$ref": "#/entities/DirectoryProfile"
+      },
+      "description": "Opt-in attendee and speaker networking directory profiles filtered by ministry role and summit track."
+    },
+    "/directoryConnections/{connectionId}": {
+      "schema": {
+        "$ref": "#/entities/DirectoryConnection"
+      },
+      "description": "Cross-organization leadership connection requests and acceptances between opted-in directory members."
+    },
+    "/sessionOverrides/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/SessionOverride"
+      },
+      "description": "Organizer-edited session times, minute allocations, slide decks, and downloadable study packets."
+    },
+    "/speakerOverrides/{speakerKey}": {
+      "schema": {
+        "$ref": "#/entities/SpeakerOverride"
+      },
+      "description": "Organizer-edited speaker bios and specialty titles."
+    },
+    "/registrations/{registrationId}": {
+      "schema": {
+        "$ref": "#/entities/RegistrationRecord"
+      },
+      "description": "Persistent attendee registrations for role-based organizer bulk approvals and check-in tracking."
+    },
+    "/users/{userId}/actionItems/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/ActionPlanItem"
+      },
+      "description": "Profile-synced 30/60/90-day post-summit ministry accountability checklist items per attendee."
+    },
+    "/users/{userId}/actionPreferences/{prefId}": {
+      "schema": {
+        "$ref": "#/entities/ActionReminderPreference"
+      },
+      "description": "Profile-synced accountability reminder cadence and default church/department preferences."
+    },
+    "/reminderSubscriptions/{userId}": {
+      "schema": {
+        "$ref": "#/entities/ReminderSubscription"
+      },
+      "description": "Scheduled outbound email digest subscriptions synced with each attendee's 30/60/90-day action plan progress."
+    },
+    "/reminderDispatchLogs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/ReminderDispatchLog"
+      },
+      "description": "Immutable outbound digest delivery audit log recorded by scheduled cron runs, admin batches, and user test sends."
+    }
+  }
+}

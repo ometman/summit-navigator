@@ -2,9 +2,1590 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow public read and write access to the questions subcollection for any session
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidSessionId(sessionId) {
+      return isValidId(sessionId) && sessionId in ['1', '2', '3', '4', '5', '6'];
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn()
+        && isEmailVerified()
+        && request.auth.token.email == 'stackvarsity@gmail.com';
+    }
+
+    function isModerator() {
+      return isSignedIn()
+        && isEmailVerified()
+        && (
+          isBootstrappedAdmin()
+          || exists(/databases/$(database)/documents/moderators/$(request.auth.uid))
+        );
+    }
+
+    function isOrganizerAdmin() {
+      return isBootstrappedAdmin()
+        || (
+          isSignedIn()
+          && isEmailVerified()
+          && exists(/databases/$(database)/documents/moderators/$(request.auth.uid))
+          && get(/databases/$(database)/documents/moderators/$(request.auth.uid)).data.role == 'admin'
+        );
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'fullName',
+          'email',
+          'organization',
+          'role',
+          'track',
+          'mfaMethod',
+          'mfaVerifiedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'fullName',
+          'email',
+          'organization',
+          'role',
+          'track',
+          'mfaMethod',
+          'mfaVerifiedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.fullName is string
+        && data.fullName.size() >= 2
+        && data.fullName.size() <= 120
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && data.email == request.auth.token.email
+        && data.organization is string
+        && data.organization.size() >= 1
+        && data.organization.size() <= 150
+        && data.role in ['Senior Pastor', 'Ministry Lead', 'Operations & Strategy', 'Youth & Outreach', 'Volunteer Coordinator']
+        && data.track in ['Morning & Afternoon', 'Morning Track', 'Afternoon Track']
+        && data.mfaMethod == 'email_otp'
+        && data.mfaVerifiedAt is string
+        && data.mfaVerifiedAt.size() >= 10
+        && data.mfaVerifiedAt.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidModerator(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'role', 'grantedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.displayName is string
+        && data.displayName.size() >= 2
+        && data.displayName.size() <= 120
+        && data.role in ['speaker', 'moderator', 'admin']
+        && isValidId(data.grantedBy)
+        && data.grantedBy == request.auth.uid
+        && data.createdAt is timestamp;
+    }
+
+    function isValidQuestion(data, sessionId, questionId) {
+      return data.keys().hasAll([
+          'id',
+          'sessionId',
+          'text',
+          'authorId',
+          'authorName',
+          'isAnonymous',
+          'upvotesCount',
+          'pinned',
+          'answered',
+          'archived',
+          'moderatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'sessionId',
+          'text',
+          'authorId',
+          'authorName',
+          'isAnonymous',
+          'upvotesCount',
+          'pinned',
+          'answered',
+          'archived',
+          'moderatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == questionId
+        && isValidSessionId(data.sessionId)
+        && data.sessionId == sessionId
+        && data.text is string
+        && data.text.size() >= 3
+        && data.text.size() <= 500
+        && isValidId(data.authorId)
+        && data.authorName is string
+        && data.authorName.size() >= 2
+        && data.authorName.size() <= 120
+        && data.isAnonymous is bool
+        && data.upvotesCount is int
+        && data.upvotesCount >= 0
+        && data.upvotesCount <= 1000000
+        && data.pinned is bool
+        && data.answered is bool
+        && data.archived is bool
+        && data.moderatedBy is string
+        && data.moderatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUpvote(data, sessionId, upvoteId) {
+      return data.keys().hasAll(['uid', 'sessionId', 'questionId', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'sessionId', 'questionId', 'createdAt'])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && isValidSessionId(data.sessionId)
+        && data.sessionId == sessionId
+        && isValidId(data.questionId)
+        && upvoteId == data.questionId + '_' + request.auth.uid
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAttendeePass(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'passCode',
+          'fullName',
+          'email',
+          'organization',
+          'role',
+          'track',
+          'status',
+          'checkInMethod',
+          'checkedInBy',
+          'checkedInAt',
+          'mfaVerifiedAt',
+          'qrSignatureDigest',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'passCode',
+          'fullName',
+          'email',
+          'organization',
+          'role',
+          'track',
+          'status',
+          'checkInMethod',
+          'checkedInBy',
+          'checkedInAt',
+          'mfaVerifiedAt',
+          'qrSignatureDigest',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.passCode is string
+        && data.passCode.size() >= 6
+        && data.passCode.size() <= 32
+        && data.passCode.matches('^[A-Z0-9\\-]+$')
+        && data.fullName is string
+        && data.fullName.size() >= 2
+        && data.fullName.size() <= 120
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && data.organization is string
+        && data.organization.size() >= 1
+        && data.organization.size() <= 150
+        && data.role in ['Senior Pastor', 'Ministry Lead', 'Operations & Strategy', 'Youth & Outreach', 'Volunteer Coordinator']
+        && data.track in ['Morning & Afternoon', 'Morning Track', 'Afternoon Track']
+        && data.status in ['Confirmed', 'Checked In']
+        && data.checkInMethod in ['none', 'self_checkin', 'organizer_scan']
+        && data.checkedInBy is string
+        && data.checkedInBy.size() <= 128
+        && data.checkedInAt is string
+        && data.checkedInAt.size() <= 64
+        && data.mfaVerifiedAt is string
+        && data.mfaVerifiedAt.size() >= 10
+        && data.mfaVerifiedAt.size() <= 64
+        && data.qrSignatureDigest is string
+        && data.qrSignatureDigest.size() >= 8
+        && data.qrSignatureDigest.size() <= 64
+        && data.qrSignatureDigest.matches('^[a-f0-9]+$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPoll(data, sessionId, pollId) {
+      return data.keys().hasAll([
+          'id',
+          'sessionId',
+          'pollType',
+          'question',
+          'options',
+          'optionCount',
+          'count0',
+          'count1',
+          'count2',
+          'count3',
+          'count4',
+          'totalVotes',
+          'status',
+          'archived',
+          'createdBy',
+          'createdByName',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'sessionId',
+          'pollType',
+          'question',
+          'options',
+          'optionCount',
+          'count0',
+          'count1',
+          'count2',
+          'count3',
+          'count4',
+          'totalVotes',
+          'status',
+          'archived',
+          'createdBy',
+          'createdByName',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == pollId
+        && isValidSessionId(data.sessionId)
+        && data.sessionId == sessionId
+        && data.pollType in ['multiple_choice', 'commitment']
+        && data.question is string
+        && data.question.size() >= 3
+        && data.question.size() <= 240
+        && data.optionCount is int
+        && data.optionCount >= 2
+        && data.optionCount <= 5
+        && data.options is list
+        && data.options.size() == data.optionCount
+        && data.options[0] is string && data.options[0].size() >= 1 && data.options[0].size() <= 100
+        && data.options[1] is string && data.options[1].size() >= 1 && data.options[1].size() <= 100
+        && (data.optionCount < 3 || (data.options[2] is string && data.options[2].size() >= 1 && data.options[2].size() <= 100))
+        && (data.optionCount < 4 || (data.options[3] is string && data.options[3].size() >= 1 && data.options[3].size() <= 100))
+        && (data.optionCount < 5 || (data.options[4] is string && data.options[4].size() >= 1 && data.options[4].size() <= 100))
+        && data.count0 is int && data.count0 >= 0 && data.count0 <= 1000000
+        && data.count1 is int && data.count1 >= 0 && data.count1 <= 1000000
+        && data.count2 is int && data.count2 >= 0 && data.count2 <= 1000000
+        && data.count3 is int && data.count3 >= 0 && data.count3 <= 1000000
+        && data.count4 is int && data.count4 >= 0 && data.count4 <= 1000000
+        && data.totalVotes is int && data.totalVotes >= 0 && data.totalVotes <= 5000000
+        && data.status in ['open', 'closed']
+        && data.archived is bool
+        && isValidId(data.createdBy)
+        && data.createdByName is string
+        && data.createdByName.size() >= 2
+        && data.createdByName.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPollVote(data, sessionId, voteId) {
+      return data.keys().hasAll(['uid', 'sessionId', 'pollId', 'optionIndex', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'sessionId', 'pollId', 'optionIndex', 'createdAt'])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && isValidSessionId(data.sessionId)
+        && data.sessionId == sessionId
+        && isValidId(data.pollId)
+        && voteId == data.pollId + '_' + request.auth.uid
+        && data.optionIndex is int
+        && data.optionIndex >= 0
+        && data.optionIndex <= 4
+        && data.createdAt is timestamp;
+    }
+
+    function isPollCountIncrementMatching(idx) {
+      return (idx == 0 && incoming().count0 == existing().count0 + 1 && incoming().count1 == existing().count1 && incoming().count2 == existing().count2 && incoming().count3 == existing().count3 && incoming().count4 == existing().count4)
+        || (idx == 1 && incoming().count0 == existing().count0 && incoming().count1 == existing().count1 + 1 && incoming().count2 == existing().count2 && incoming().count3 == existing().count3 && incoming().count4 == existing().count4)
+        || (idx == 2 && incoming().count0 == existing().count0 && incoming().count1 == existing().count1 && incoming().count2 == existing().count2 + 1 && incoming().count3 == existing().count3 && incoming().count4 == existing().count4)
+        || (idx == 3 && incoming().count0 == existing().count0 && incoming().count1 == existing().count1 && incoming().count2 == existing().count2 && incoming().count3 == existing().count3 + 1 && incoming().count4 == existing().count4)
+        || (idx == 4 && incoming().count0 == existing().count0 && incoming().count1 == existing().count1 && incoming().count2 == existing().count2 && incoming().count3 == existing().count3 && incoming().count4 == existing().count4 + 1);
+    }
+
+    function isValidConnectionDocId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 260 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDirectoryProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'fullName',
+          'organization',
+          'role',
+          'track',
+          'memberType',
+          'bio',
+          'focusTopics',
+          'optedIn',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'fullName',
+          'organization',
+          'role',
+          'track',
+          'memberType',
+          'bio',
+          'focusTopics',
+          'optedIn',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.fullName is string
+        && data.fullName.size() >= 2
+        && data.fullName.size() <= 120
+        && data.organization is string
+        && data.organization.size() >= 1
+        && data.organization.size() <= 150
+        && data.role in ['Senior Pastor', 'Ministry Lead', 'Operations & Strategy', 'Youth & Outreach', 'Volunteer Coordinator']
+        && data.track in ['Morning & Afternoon', 'Morning Track', 'Afternoon Track']
+        && data.memberType in ['attendee', 'speaker']
+        && data.bio is string
+        && data.bio.size() <= 280
+        && data.focusTopics is list
+        && data.focusTopics.size() <= 5
+        && (data.focusTopics.size() < 1 || (data.focusTopics[0] is string && data.focusTopics[0].size() >= 1 && data.focusTopics[0].size() <= 40))
+        && (data.focusTopics.size() < 2 || (data.focusTopics[1] is string && data.focusTopics[1].size() >= 1 && data.focusTopics[1].size() <= 40))
+        && (data.focusTopics.size() < 3 || (data.focusTopics[2] is string && data.focusTopics[2].size() >= 1 && data.focusTopics[2].size() <= 40))
+        && (data.focusTopics.size() < 4 || (data.focusTopics[3] is string && data.focusTopics[3].size() >= 1 && data.focusTopics[3].size() <= 40))
+        && (data.focusTopics.size() < 5 || (data.focusTopics[4] is string && data.focusTopics[4].size() >= 1 && data.focusTopics[4].size() <= 40))
+        && data.optedIn is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDirectoryConnection(data, connectionId) {
+      return data.keys().hasAll([
+          'id',
+          'senderUid',
+          'senderName',
+          'senderOrg',
+          'senderRole',
+          'recipientUid',
+          'recipientName',
+          'recipientOrg',
+          'recipientRole',
+          'message',
+          'replyNote',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'senderUid',
+          'senderName',
+          'senderOrg',
+          'senderRole',
+          'recipientUid',
+          'recipientName',
+          'recipientOrg',
+          'recipientRole',
+          'message',
+          'replyNote',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidConnectionDocId(data.id)
+        && data.id == connectionId
+        && isValidId(data.senderUid)
+        && isValidId(data.recipientUid)
+        && connectionId == data.senderUid + '_' + data.recipientUid
+        && data.senderName is string && data.senderName.size() >= 2 && data.senderName.size() <= 120
+        && data.senderOrg is string && data.senderOrg.size() >= 1 && data.senderOrg.size() <= 150
+        && data.senderRole in ['Senior Pastor', 'Ministry Lead', 'Operations & Strategy', 'Youth & Outreach', 'Volunteer Coordinator']
+        && data.recipientName is string && data.recipientName.size() >= 2 && data.recipientName.size() <= 120
+        && data.recipientOrg is string && data.recipientOrg.size() >= 1 && data.recipientOrg.size() <= 150
+        && data.recipientRole in ['Senior Pastor', 'Ministry Lead', 'Operations & Strategy', 'Youth & Outreach', 'Volunteer Coordinator']
+        && data.message is string && data.message.size() >= 3 && data.message.size() <= 300
+        && data.replyNote is string && data.replyNote.size() <= 300
+        && data.status in ['pending', 'accepted', 'declined']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isEmailVerified() && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'fullName',
+          'organization',
+          'role',
+          'track',
+          'mfaVerifiedAt',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    match /attendeePasses/{userId} {
+      allow get: if isValidId(userId)
+        && isSignedIn()
+        && isEmailVerified()
+        && (isOwner(userId) || isModerator());
+
+      allow list: if isBootstrappedAdmin()
+        && existing().status in ['Confirmed', 'Checked In'];
+
+      allow create: if isSignedIn()
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidAttendeePass(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isOwner(userId)
+            && incoming().email == request.auth.token.email
+            && incoming().status == 'Confirmed'
+            && incoming().checkInMethod == 'none'
+            && incoming().checkedInBy == ''
+            && incoming().checkedInAt == ''
+          )
+          || (
+            isModerator()
+            && incoming().status == 'Checked In'
+            && incoming().checkInMethod == 'organizer_scan'
+            && incoming().checkedInBy == request.auth.uid
+            && incoming().checkedInAt.size() >= 10
+          )
+        );
+
+      allow update: if isSignedIn()
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidAttendeePass(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().passCode == existing().passCode
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isOwner(userId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'fullName',
+              'organization',
+              'role',
+              'track',
+              'mfaVerifiedAt',
+              'qrSignatureDigest',
+              'updatedAt'
+            ])
+          )
+          || (
+            isOwner(userId)
+            && existing().status == 'Confirmed'
+            && incoming().status == 'Checked In'
+            && incoming().checkInMethod == 'self_checkin'
+            && incoming().checkedInBy == request.auth.uid
+            && incoming().checkedInAt.size() >= 10
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status',
+              'checkInMethod',
+              'checkedInBy',
+              'checkedInAt',
+              'updatedAt'
+            ])
+          )
+          || (
+            isModerator()
+            && (
+              (
+                incoming().status == 'Checked In'
+                && incoming().checkInMethod == 'organizer_scan'
+                && incoming().checkedInBy == request.auth.uid
+                && incoming().checkedInAt.size() >= 10
+              )
+              || (
+                incoming().status == 'Confirmed'
+                && incoming().checkInMethod == 'none'
+                && incoming().checkedInBy == ''
+                && incoming().checkedInAt == ''
+              )
+            )
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status',
+              'checkInMethod',
+              'checkedInBy',
+              'checkedInAt',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /moderators/{userId} {
+      allow get: if isValidId(userId) && ((isOwner(userId) && isEmailVerified()) || isBootstrappedAdmin());
+      allow list: if isBootstrappedAdmin()
+        && existing().role in ['speaker', 'moderator', 'admin'];
+      allow create: if isBootstrappedAdmin()
+        && isValidId(userId)
+        && isValidModerator(incoming(), userId)
+        && incoming().createdAt == request.time;
+      allow update: if isBootstrappedAdmin()
+        && isValidId(userId)
+        && isValidModerator(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'grantedBy']);
+      allow delete: if isBootstrappedAdmin() && isValidId(userId);
+    }
+
     match /sessions/{sessionId}/questions/{questionId} {
-      allow read, write: if true;
+      allow get: if isValidSessionId(sessionId)
+        && isValidId(questionId)
+        && existing().sessionId == sessionId
+        && (
+          existing().archived == false
+          || isModerator()
+          || (isSignedIn() && isEmailVerified() && existing().authorId == request.auth.uid)
+        );
+
+      allow list: if isValidSessionId(sessionId)
+        && (
+          existing().archived == false
+          || isBootstrappedAdmin()
+          || (isSignedIn() && isEmailVerified() && existing().authorId == request.auth.uid)
+        );
+
+      allow create: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(questionId)
+        && isValidQuestion(incoming(), sessionId, questionId)
+        && incoming().authorId == request.auth.uid
+        && (
+          (incoming().isAnonymous == true && incoming().authorName == 'Anonymous')
+          || (incoming().isAnonymous == false && incoming().authorName != 'Anonymous')
+        )
+        && incoming().upvotesCount == 0
+        && incoming().pinned == false
+        && incoming().answered == false
+        && incoming().archived == false
+        && incoming().moderatedBy == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(questionId)
+        && isValidQuestion(incoming(), sessionId, questionId)
+        && incoming().id == existing().id
+        && incoming().sessionId == existing().sessionId
+        && incoming().authorId == existing().authorId
+        && incoming().authorName == existing().authorName
+        && incoming().isAnonymous == existing().isAnonymous
+        && incoming().text == existing().text
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            existing().archived == false
+            && incoming().diff(existing()).affectedKeys().hasOnly(['upvotesCount', 'updatedAt'])
+            && incoming().upvotesCount == existing().upvotesCount + 1
+            && !exists(/databases/$(database)/documents/sessions/$(sessionId)/upvotes/$(questionId + '_' + request.auth.uid))
+            && existsAfter(/databases/$(database)/documents/sessions/$(sessionId)/upvotes/$(questionId + '_' + request.auth.uid))
+          )
+          || (
+            existing().archived == false
+            && incoming().diff(existing()).affectedKeys().hasOnly(['upvotesCount', 'updatedAt'])
+            && existing().upvotesCount > 0
+            && incoming().upvotesCount == existing().upvotesCount - 1
+            && exists(/databases/$(database)/documents/sessions/$(sessionId)/upvotes/$(questionId + '_' + request.auth.uid))
+            && !existsAfter(/databases/$(database)/documents/sessions/$(sessionId)/upvotes/$(questionId + '_' + request.auth.uid))
+          )
+          || (
+            isModerator()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['pinned', 'answered', 'archived', 'moderatedBy', 'updatedAt'])
+            && incoming().moderatedBy == request.auth.uid
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /sessions/{sessionId}/upvotes/{upvoteId} {
+      allow get: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(upvoteId)
+        && existing().uid == request.auth.uid;
+
+      allow list: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && existing().uid == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(upvoteId)
+        && isValidUpvote(incoming(), sessionId, upvoteId)
+        && incoming().createdAt == request.time
+        && !exists(/databases/$(database)/documents/sessions/$(sessionId)/upvotes/$(upvoteId))
+        && exists(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(incoming().questionId))
+        && get(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(incoming().questionId)).data.archived == false
+        && getAfter(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(incoming().questionId)).data.upvotesCount
+          == get(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(incoming().questionId)).data.upvotesCount + 1;
+
+      allow update: if false;
+
+      allow delete: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(upvoteId)
+        && existing().uid == request.auth.uid
+        && upvoteId == existing().questionId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(existing().questionId))
+        && get(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(existing().questionId)).data.archived == false
+        && getAfter(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(existing().questionId)).data.upvotesCount
+          == get(/databases/$(database)/documents/sessions/$(sessionId)/questions/$(existing().questionId)).data.upvotesCount - 1;
+    }
+
+    match /sessions/{sessionId}/polls/{pollId} {
+      allow get: if isValidSessionId(sessionId)
+        && isValidId(pollId)
+        && existing().sessionId == sessionId
+        && (
+          existing().archived == false
+          || isModerator()
+          || (isSignedIn() && isEmailVerified() && existing().createdBy == request.auth.uid)
+        );
+
+      allow list: if isValidSessionId(sessionId)
+        && (
+          existing().archived == false
+          || isBootstrappedAdmin()
+          || (isSignedIn() && isEmailVerified() && existing().createdBy == request.auth.uid)
+        );
+
+      allow create: if isModerator()
+        && isValidSessionId(sessionId)
+        && isValidId(pollId)
+        && isValidPoll(incoming(), sessionId, pollId)
+        && incoming().createdBy == request.auth.uid
+        && incoming().count0 == 0
+        && incoming().count1 == 0
+        && incoming().count2 == 0
+        && incoming().count3 == 0
+        && incoming().count4 == 0
+        && incoming().totalVotes == 0
+        && incoming().status == 'open'
+        && incoming().archived == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(pollId)
+        && isValidPoll(incoming(), sessionId, pollId)
+        && incoming().id == existing().id
+        && incoming().sessionId == existing().sessionId
+        && incoming().pollType == existing().pollType
+        && incoming().question == existing().question
+        && incoming().options == existing().options
+        && incoming().optionCount == existing().optionCount
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdByName == existing().createdByName
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            existing().archived == false
+            && existing().status == 'open'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['count0', 'count1', 'count2', 'count3', 'count4', 'totalVotes', 'updatedAt'])
+            && incoming().totalVotes == existing().totalVotes + 1
+            && !exists(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(pollId + '_' + request.auth.uid))
+            && existsAfter(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(pollId + '_' + request.auth.uid))
+            && getAfter(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(pollId + '_' + request.auth.uid)).data.optionIndex is int
+            && getAfter(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(pollId + '_' + request.auth.uid)).data.optionIndex >= 0
+            && getAfter(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(pollId + '_' + request.auth.uid)).data.optionIndex < existing().optionCount
+            && isPollCountIncrementMatching(getAfter(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(pollId + '_' + request.auth.uid)).data.optionIndex)
+          )
+          || (
+            isModerator()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'archived', 'updatedAt'])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /sessions/{sessionId}/pollVotes/{voteId} {
+      allow get: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(voteId)
+        && existing().uid == request.auth.uid;
+
+      allow list: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && existing().uid == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isEmailVerified()
+        && isValidSessionId(sessionId)
+        && isValidId(voteId)
+        && isValidPollVote(incoming(), sessionId, voteId)
+        && incoming().createdAt == request.time
+        && !exists(/databases/$(database)/documents/sessions/$(sessionId)/pollVotes/$(voteId))
+        && exists(/databases/$(database)/documents/sessions/$(sessionId)/polls/$(incoming().pollId))
+        && get(/databases/$(database)/documents/sessions/$(sessionId)/polls/$(incoming().pollId)).data.archived == false
+        && get(/databases/$(database)/documents/sessions/$(sessionId)/polls/$(incoming().pollId)).data.status == 'open'
+        && incoming().optionIndex < get(/databases/$(database)/documents/sessions/$(sessionId)/polls/$(incoming().pollId)).data.optionCount
+        && getAfter(/databases/$(database)/documents/sessions/$(sessionId)/polls/$(incoming().pollId)).data.totalVotes
+          == get(/databases/$(database)/documents/sessions/$(sessionId)/polls/$(incoming().pollId)).data.totalVotes + 1;
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /directoryProfiles/{userId} {
+      allow get: if isValidId(userId)
+        && (
+          existing().optedIn == true
+          || (isSignedIn() && isEmailVerified() && isOwner(userId))
+          || isModerator()
+        );
+
+      allow list: if existing().optedIn == true
+        || (isSignedIn() && isEmailVerified() && existing().uid == request.auth.uid);
+
+      allow create: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidDirectoryProfile(incoming(), userId)
+        && incoming().uid == request.auth.uid
+        && (incoming().memberType == 'attendee' || isModerator())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidDirectoryProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (incoming().memberType == 'attendee' || isModerator())
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'fullName',
+          'organization',
+          'role',
+          'track',
+          'memberType',
+          'bio',
+          'focusTopics',
+          'optedIn',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    match /directoryConnections/{connectionId} {
+      allow get: if isSignedIn()
+        && isEmailVerified()
+        && isValidConnectionDocId(connectionId)
+        && (
+          existing().senderUid == request.auth.uid
+          || existing().recipientUid == request.auth.uid
+        );
+
+      allow list: if isSignedIn()
+        && isEmailVerified()
+        && (
+          existing().senderUid == request.auth.uid
+          || existing().recipientUid == request.auth.uid
+        );
+
+      allow create: if isSignedIn()
+        && isEmailVerified()
+        && isValidConnectionDocId(connectionId)
+        && isValidDirectoryConnection(incoming(), connectionId)
+        && incoming().senderUid == request.auth.uid
+        && incoming().recipientUid != request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().replyNote == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && !exists(/databases/$(database)/documents/directoryConnections/$(connectionId))
+        && exists(/databases/$(database)/documents/directoryProfiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/directoryProfiles/$(request.auth.uid)).data.optedIn == true
+        && exists(/databases/$(database)/documents/directoryProfiles/$(incoming().recipientUid))
+        && get(/databases/$(database)/documents/directoryProfiles/$(incoming().recipientUid)).data.optedIn == true;
+
+      allow update: if isSignedIn()
+        && isEmailVerified()
+        && isValidConnectionDocId(connectionId)
+        && isValidDirectoryConnection(incoming(), connectionId)
+        && incoming().id == existing().id
+        && incoming().senderUid == existing().senderUid
+        && incoming().senderName == existing().senderName
+        && incoming().senderOrg == existing().senderOrg
+        && incoming().senderRole == existing().senderRole
+        && incoming().recipientUid == existing().recipientUid
+        && incoming().recipientName == existing().recipientName
+        && incoming().recipientOrg == existing().recipientOrg
+        && incoming().recipientRole == existing().recipientRole
+        && incoming().message == existing().message
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existing().status == 'pending'
+        && request.auth.uid == existing().recipientUid
+        && incoming().status in ['accepted', 'declined']
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status',
+          'replyNote',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    function isValidSpeakerKey(speakerKey) {
+      return speakerKey is string
+        && speakerKey.size() >= 1
+        && speakerKey.size() <= 128
+        && speakerKey.matches('^[a-z0-9\\-]+$');
+    }
+
+    function isValidSlideBulletList(bullets) {
+      return bullets is list
+        && bullets.size() >= 1
+        && bullets.size() <= 6
+        && (bullets.size() < 1 || (bullets[0] is string && bullets[0].size() >= 2 && bullets[0].size() <= 240))
+        && (bullets.size() < 2 || (bullets[1] is string && bullets[1].size() >= 2 && bullets[1].size() <= 240))
+        && (bullets.size() < 3 || (bullets[2] is string && bullets[2].size() >= 2 && bullets[2].size() <= 240))
+        && (bullets.size() < 4 || (bullets[3] is string && bullets[3].size() >= 2 && bullets[3].size() <= 240))
+        && (bullets.size() < 5 || (bullets[4] is string && bullets[4].size() >= 2 && bullets[4].size() <= 240))
+        && (bullets.size() < 6 || (bullets[5] is string && bullets[5].size() >= 2 && bullets[5].size() <= 240));
+    }
+
+    function isValidSlideMap(slide) {
+      return slide is map
+        && slide.keys().hasAll(['heading', 'subheading', 'bullets', 'caption', 'accentHex'])
+        && slide.keys().hasOnly(['heading', 'subheading', 'bullets', 'caption', 'accentHex'])
+        && slide.heading is string && slide.heading.size() >= 2 && slide.heading.size() <= 160
+        && slide.subheading is string && slide.subheading.size() >= 2 && slide.subheading.size() <= 160
+        && isValidSlideBulletList(slide.bullets)
+        && slide.caption is string && slide.caption.size() >= 2 && slide.caption.size() <= 300
+        && slide.accentHex is string && slide.accentHex.matches('^#[0-9A-Fa-f]{6}$');
+    }
+
+    function isValidSessionOverride(data, sessionId) {
+      return data.keys().hasAll([
+          'sessionId',
+          'time',
+          'title',
+          'speaker',
+          'content',
+          'qa',
+          'prayer',
+          'summary',
+          'studyPacketTitle',
+          'studyPacketNotes',
+          'slides',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'sessionId',
+          'time',
+          'title',
+          'speaker',
+          'content',
+          'qa',
+          'prayer',
+          'summary',
+          'studyPacketTitle',
+          'studyPacketNotes',
+          'slides',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidSessionId(data.sessionId)
+        && data.sessionId == sessionId
+        && data.time is string && data.time.size() >= 3 && data.time.size() <= 80
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 160
+        && data.speaker is string && data.speaker.size() >= 2 && data.speaker.size() <= 120
+        && data.content is int && data.content >= 1 && data.content <= 180
+        && data.qa is int && data.qa >= 0 && data.qa <= 120
+        && data.prayer is int && data.prayer >= 0 && data.prayer <= 60
+        && data.summary is string && data.summary.size() >= 10 && data.summary.size() <= 2000
+        && data.studyPacketTitle is string && data.studyPacketTitle.size() >= 2 && data.studyPacketTitle.size() <= 160
+        && data.studyPacketNotes is string && data.studyPacketNotes.size() <= 4000
+        && data.slides is list
+        && data.slides.size() >= 1
+        && data.slides.size() <= 8
+        && (data.slides.size() < 1 || isValidSlideMap(data.slides[0]))
+        && (data.slides.size() < 2 || isValidSlideMap(data.slides[1]))
+        && (data.slides.size() < 3 || isValidSlideMap(data.slides[2]))
+        && (data.slides.size() < 4 || isValidSlideMap(data.slides[3]))
+        && (data.slides.size() < 5 || isValidSlideMap(data.slides[4]))
+        && (data.slides.size() < 6 || isValidSlideMap(data.slides[5]))
+        && (data.slides.size() < 7 || isValidSlideMap(data.slides[6]))
+        && (data.slides.size() < 8 || isValidSlideMap(data.slides[7]))
+        && isValidId(data.updatedBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSpeakerOverride(data, speakerKey) {
+      return data.keys().hasAll([
+          'speakerKey',
+          'name',
+          'role',
+          'bio',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'speakerKey',
+          'name',
+          'role',
+          'bio',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidSpeakerKey(data.speakerKey)
+        && data.speakerKey == speakerKey
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 120
+        && data.role is string && data.role.size() >= 2 && data.role.size() <= 120
+        && data.bio is string && data.bio.size() >= 10 && data.bio.size() <= 2000
+        && isValidId(data.updatedBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRegistrationRecord(data, registrationId) {
+      return data.keys().hasAll([
+          'id',
+          'fullName',
+          'email',
+          'organization',
+          'role',
+          'track',
+          'source',
+          'status',
+          'registeredAt',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'fullName',
+          'email',
+          'organization',
+          'role',
+          'track',
+          'source',
+          'status',
+          'registeredAt',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == registrationId
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.organization is string && data.organization.size() >= 1 && data.organization.size() <= 150
+        && data.role in ['Senior Pastor', 'Ministry Lead', 'Operations & Strategy', 'Youth & Outreach', 'Volunteer Coordinator']
+        && data.track in ['Morning & Afternoon', 'Morning Track', 'Afternoon Track']
+        && data.source in ['Web Registration', 'Direct Invite', 'Ministry Partner']
+        && data.status in ['Confirmed', 'Pending Verification', 'Checked In']
+        && data.registeredAt is string && data.registeredAt.size() >= 10 && data.registeredAt.size() <= 64
+        && data.updatedBy is string && data.updatedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /sessionOverrides/{sessionId} {
+      allow get: if isValidSessionId(sessionId);
+      allow list: if false;
+
+      allow create: if (isOrganizerAdmin() || isModerator())
+        && isValidSessionId(sessionId)
+        && isValidSessionOverride(incoming(), sessionId)
+        && incoming().updatedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if (isOrganizerAdmin() || isModerator())
+        && isValidSessionId(sessionId)
+        && isValidSessionOverride(incoming(), sessionId)
+        && incoming().sessionId == existing().sessionId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+
+      allow delete: if isOrganizerAdmin() && isValidSessionId(sessionId);
+    }
+
+    match /speakerOverrides/{speakerKey} {
+      allow get: if isValidSpeakerKey(speakerKey);
+      allow list: if false;
+
+      allow create: if (isOrganizerAdmin() || isModerator())
+        && isValidSpeakerKey(speakerKey)
+        && isValidSpeakerOverride(incoming(), speakerKey)
+        && incoming().updatedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if (isOrganizerAdmin() || isModerator())
+        && isValidSpeakerKey(speakerKey)
+        && isValidSpeakerOverride(incoming(), speakerKey)
+        && incoming().speakerKey == existing().speakerKey
+        && incoming().name == existing().name
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+
+      allow delete: if isOrganizerAdmin() && isValidSpeakerKey(speakerKey);
+    }
+
+    match /registrations/{registrationId} {
+      allow get: if isValidId(registrationId)
+        && (
+          isOrganizerAdmin()
+          || (isSignedIn() && isEmailVerified() && existing().email == request.auth.token.email)
+        );
+
+      allow list: if isBootstrappedAdmin()
+        && existing().status in ['Confirmed', 'Pending Verification', 'Checked In'];
+
+      allow create: if isValidId(registrationId)
+        && isValidRegistrationRecord(incoming(), registrationId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isOrganizerAdmin()
+            && (incoming().updatedBy == '' || incoming().updatedBy == request.auth.uid)
+          )
+          || (
+            isSignedIn()
+            && isEmailVerified()
+            && incoming().email == request.auth.token.email
+            && incoming().status in ['Pending Verification', 'Confirmed']
+            && incoming().updatedBy == ''
+          )
+        );
+
+      allow update: if isOrganizerAdmin()
+        && isValidId(registrationId)
+        && isValidRegistrationRecord(incoming(), registrationId)
+        && incoming().id == existing().id
+        && incoming().email == existing().email
+        && incoming().registeredAt == existing().registeredAt
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status',
+          'track',
+          'role',
+          'organization',
+          'updatedBy',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    function isValidActionPlanItem(data, userId, itemId) {
+      return data.keys().hasAll([
+          'id',
+          'uid',
+          'sessionId',
+          'sessionTitle',
+          'title',
+          'notes',
+          'horizonDays',
+          'churchName',
+          'department',
+          'assigneeLabel',
+          'status',
+          'dueDateIso',
+          'completedAtIso',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'uid',
+          'sessionId',
+          'sessionTitle',
+          'title',
+          'notes',
+          'horizonDays',
+          'churchName',
+          'department',
+          'assigneeLabel',
+          'status',
+          'dueDateIso',
+          'completedAtIso',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == itemId
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && isValidSessionId(data.sessionId)
+        && data.sessionTitle is string && data.sessionTitle.size() >= 2 && data.sessionTitle.size() <= 160
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 220
+        && data.notes is string && data.notes.size() <= 600
+        && data.horizonDays is int && data.horizonDays in [30, 60, 90]
+        && data.churchName is string && data.churchName.size() >= 1 && data.churchName.size() <= 150
+        && data.department is string && data.department.size() >= 2 && data.department.size() <= 80
+        && data.assigneeLabel is string && data.assigneeLabel.size() >= 1 && data.assigneeLabel.size() <= 120
+        && data.status in ['pending', 'in_progress', 'completed']
+        && data.dueDateIso is string && data.dueDateIso.size() >= 10 && data.dueDateIso.size() <= 32
+        && data.completedAtIso is string && data.completedAtIso.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidActionReminderPreference(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'enabled',
+          'cadence',
+          'reminderDay',
+          'preferredChannel',
+          'churchName',
+          'defaultDepartment',
+          'summitDateIso',
+          'lastCheckInIso',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'enabled',
+          'cadence',
+          'reminderDay',
+          'preferredChannel',
+          'churchName',
+          'defaultDepartment',
+          'summitDateIso',
+          'lastCheckInIso',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.enabled is bool
+        && data.cadence in ['weekly', 'biweekly', 'monthly']
+        && data.reminderDay in ['Monday', 'Wednesday', 'Friday', 'Saturday']
+        && data.preferredChannel in ['email_digest', 'dashboard_banner', 'both']
+        && data.churchName is string && data.churchName.size() >= 1 && data.churchName.size() <= 150
+        && data.defaultDepartment is string && data.defaultDepartment.size() >= 2 && data.defaultDepartment.size() <= 80
+        && data.summitDateIso is string && data.summitDateIso.size() >= 10 && data.summitDateIso.size() <= 32
+        && data.lastCheckInIso is string && data.lastCheckInIso.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/actionItems/{itemId} {
+      allow get: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidId(itemId);
+
+      allow list: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && existing().uid == request.auth.uid;
+
+      allow create: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidId(itemId)
+        && isValidActionPlanItem(incoming(), userId, itemId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidId(itemId)
+        && isValidActionPlanItem(incoming(), userId, itemId)
+        && incoming().id == existing().id
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'sessionId',
+          'sessionTitle',
+          'title',
+          'notes',
+          'horizonDays',
+          'churchName',
+          'department',
+          'assigneeLabel',
+          'status',
+          'dueDateIso',
+          'completedAtIso',
+          'updatedAt'
+        ]);
+
+      allow delete: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidId(itemId);
+    }
+
+    match /users/{userId}/actionPreferences/{prefId} {
+      allow get: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && prefId == 'reminders';
+
+      allow list: if false;
+
+      allow create: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && prefId == 'reminders'
+        && isValidActionReminderPreference(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && prefId == 'reminders'
+        && isValidActionReminderPreference(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'enabled',
+          'cadence',
+          'reminderDay',
+          'preferredChannel',
+          'churchName',
+          'defaultDepartment',
+          'summitDateIso',
+          'lastCheckInIso',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    function isValidTopOpenTitleList(titles) {
+      return titles is list
+        && titles.size() <= 5
+        && (titles.size() < 1 || (titles[0] is string && titles[0].size() >= 2 && titles[0].size() <= 240))
+        && (titles.size() < 2 || (titles[1] is string && titles[1].size() >= 2 && titles[1].size() <= 240))
+        && (titles.size() < 3 || (titles[2] is string && titles[2].size() >= 2 && titles[2].size() <= 240))
+        && (titles.size() < 4 || (titles[3] is string && titles[3].size() >= 2 && titles[3].size() <= 240))
+        && (titles.size() < 5 || (titles[4] is string && titles[4].size() >= 2 && titles[4].size() <= 240));
+    }
+
+    function isValidReminderSubscription(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'email',
+          'displayName',
+          'enabled',
+          'cadence',
+          'reminderDay',
+          'preferredChannel',
+          'churchName',
+          'defaultDepartment',
+          'summitDateIso',
+          'lastCheckInIso',
+          'lastEmailedAtIso',
+          'nextDueAtIso',
+          'openCount',
+          'completedCount',
+          'overdueCount',
+          'dueSoonCount',
+          'topOpenTitles',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'enabled',
+          'cadence',
+          'reminderDay',
+          'preferredChannel',
+          'churchName',
+          'defaultDepartment',
+          'summitDateIso',
+          'lastCheckInIso',
+          'lastEmailedAtIso',
+          'nextDueAtIso',
+          'openCount',
+          'completedCount',
+          'overdueCount',
+          'dueSoonCount',
+          'topOpenTitles',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 120
+        && data.enabled is bool
+        && data.cadence in ['weekly', 'biweekly', 'monthly']
+        && data.reminderDay in ['Monday', 'Wednesday', 'Friday', 'Saturday']
+        && data.preferredChannel in ['email_digest', 'dashboard_banner', 'both']
+        && data.churchName is string && data.churchName.size() >= 1 && data.churchName.size() <= 150
+        && data.defaultDepartment is string && data.defaultDepartment.size() >= 2 && data.defaultDepartment.size() <= 80
+        && data.summitDateIso is string && data.summitDateIso.size() >= 10 && data.summitDateIso.size() <= 32
+        && data.lastCheckInIso is string && data.lastCheckInIso.size() <= 64
+        && data.lastEmailedAtIso is string && data.lastEmailedAtIso.size() <= 64
+        && data.nextDueAtIso is string && data.nextDueAtIso.size() >= 10 && data.nextDueAtIso.size() <= 32
+        && data.openCount is int && data.openCount >= 0 && data.openCount <= 10000
+        && data.completedCount is int && data.completedCount >= 0 && data.completedCount <= 10000
+        && data.overdueCount is int && data.overdueCount >= 0 && data.overdueCount <= 10000
+        && data.dueSoonCount is int && data.dueSoonCount >= 0 && data.dueSoonCount <= 10000
+        && isValidTopOpenTitleList(data.topOpenTitles)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReminderDispatchLog(data, logId) {
+      return data.keys().hasAll([
+          'id',
+          'uid',
+          'recipientEmail',
+          'recipientName',
+          'churchName',
+          'cadence',
+          'triggerSource',
+          'deliveryMode',
+          'status',
+          'openCount',
+          'overdueCount',
+          'dueSoonCount',
+          'subject',
+          'sentAtIso',
+          'errorMessage',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'uid',
+          'recipientEmail',
+          'recipientName',
+          'churchName',
+          'cadence',
+          'triggerSource',
+          'deliveryMode',
+          'status',
+          'openCount',
+          'overdueCount',
+          'dueSoonCount',
+          'subject',
+          'sentAtIso',
+          'errorMessage',
+          'createdAt'
+        ])
+        && isValidId(data.id)
+        && data.id == logId
+        && isValidId(data.uid)
+        && data.recipientEmail is string && data.recipientEmail.size() >= 3 && data.recipientEmail.size() <= 254
+        && data.recipientName is string && data.recipientName.size() >= 2 && data.recipientName.size() <= 120
+        && data.churchName is string && data.churchName.size() >= 1 && data.churchName.size() <= 150
+        && data.cadence in ['weekly', 'biweekly', 'monthly']
+        && data.triggerSource in ['cron_scheduler', 'admin_console', 'user_test']
+        && data.deliveryMode in ['resend', 'smtp', 'preview']
+        && data.status in ['sent', 'preview', 'failed', 'skipped']
+        && data.openCount is int && data.openCount >= 0 && data.openCount <= 10000
+        && data.overdueCount is int && data.overdueCount >= 0 && data.overdueCount <= 10000
+        && data.dueSoonCount is int && data.dueSoonCount >= 0 && data.dueSoonCount <= 10000
+        && data.subject is string && data.subject.size() >= 3 && data.subject.size() <= 200
+        && data.sentAtIso is string && data.sentAtIso.size() >= 10 && data.sentAtIso.size() <= 64
+        && data.errorMessage is string && data.errorMessage.size() <= 300
+        && data.createdAt is timestamp;
+    }
+
+    match /reminderSubscriptions/{userId} {
+      allow get: if isValidId(userId)
+        && (
+          (isOwner(userId) && isEmailVerified())
+          || isBootstrappedAdmin()
+        );
+
+      allow list: if isBootstrappedAdmin()
+        && existing().cadence in ['weekly', 'biweekly', 'monthly'];
+
+      allow create: if isOwner(userId)
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidReminderSubscription(incoming(), userId)
+        && incoming().uid == request.auth.uid
+        && incoming().email == request.auth.token.email
+        && incoming().lastEmailedAtIso == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isEmailVerified()
+        && isValidId(userId)
+        && isValidReminderSubscription(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isOwner(userId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName',
+              'enabled',
+              'cadence',
+              'reminderDay',
+              'preferredChannel',
+              'churchName',
+              'defaultDepartment',
+              'summitDateIso',
+              'lastCheckInIso',
+              'lastEmailedAtIso',
+              'nextDueAtIso',
+              'openCount',
+              'completedCount',
+              'overdueCount',
+              'dueSoonCount',
+              'topOpenTitles',
+              'updatedAt'
+            ])
+          )
+          || (
+            isBootstrappedAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'lastEmailedAtIso',
+              'nextDueAtIso',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /reminderDispatchLogs/{logId} {
+      allow get: if isSignedIn()
+        && isEmailVerified()
+        && isValidId(logId)
+        && (isBootstrappedAdmin() || existing().uid == request.auth.uid);
+
+      allow list: if isSignedIn()
+        && isEmailVerified()
+        && (isBootstrappedAdmin() || existing().uid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isEmailVerified()
+        && isValidId(logId)
+        && isValidReminderDispatchLog(incoming(), logId)
+        && incoming().createdAt == request.time
+        && (
+          isBootstrappedAdmin()
+          || (
+            isOwner(incoming().uid)
+            && incoming().triggerSource == 'user_test'
+            && incoming().recipientEmail == request.auth.token.email
+          )
+        );
+
+      allow update, delete: if false;
     }
   }
 }

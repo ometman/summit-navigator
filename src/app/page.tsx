@@ -23,7 +23,12 @@ export default function HomePage() {
                 </Button>
                 <Button asChild size="lg" variant="secondary">
                   <Link href="/login">
-                    Register or Login <LogIn className="ml-2 h-5 w-5" />
+                    <LogIn className="mr-2 h-5 w-5" /> Sign In with Google
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <Link href="/register">
+                    Register
                   </Link>
                 </Button>
               </div>

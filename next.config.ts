@@ -1,7 +1,12 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
+import { PHASE_DEVELOPMENT_SERVER } from 'next/constants';
 
-const nextConfig: NextConfig = {
-  /* config options here */
+const nextConfig = (phase: string): NextConfig => ({
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next',
+  ...(phase !== PHASE_DEVELOPMENT_SERVER ? { output: 'standalone' as const } : {}),
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts'],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -30,6 +35,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-};
+});
 
 export default nextConfig;

@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ClipboardList, LogIn } from "lucide-react";
-import { agendaData, type Session } from "@/lib/data";
+import { ClipboardList } from "lucide-react";
+import { type Session } from "@/lib/data";
+import { useSummitContent } from "@/components/content/summit-content-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/firebase";
 
 function SessionItem({
   session,
@@ -55,13 +54,13 @@ function SessionItem({
           <h4 className="text-base font-bold text-primary mb-3">Time Breakdown</h4>
           <div className="grid grid-cols-3 gap-2 text-center text-sm font-medium">
             <div className="p-2 bg-green-100 rounded">
-              <span className="text-green-800">Content: <span className="font-bold">{session.content} min</span></span>
+              <span className="text-green-800">Content: <span className="font-bold tabular-nums">{session.content} min</span></span>
             </div>
             <div className="p-2 bg-blue-100 rounded">
-              <span className="text-blue-800">Q&A: <span className="font-bold">{session.qa} min</span></span>
+              <span className="text-blue-800">Q&A: <span className="font-bold tabular-nums">{session.qa} min</span></span>
             </div>
             <div className="p-2 bg-red-100 rounded">
-              <span className="text-red-800">Prayer: <span className="font-bold">{session.prayer} min</span></span>
+              <span className="text-red-800">Prayer: <span className="font-bold tabular-nums">{session.prayer} min</span></span>
             </div>
           </div>
           <p className="mt-3 text-xs">
@@ -77,10 +76,11 @@ function SessionItem({
 }
 
 export function AgendaList() {
+  const { sessions } = useSummitContent();
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
-  const morningSessions = agendaData.filter((s) => !s.afternoon);
-  const afternoonSessions = agendaData.filter((s) => s.afternoon);
+  const morningSessions = sessions.filter((s) => !s.afternoon);
+  const afternoonSessions = sessions.filter((s) => s.afternoon);
 
   const handleSelect = (sessionId: number) => {
     setSelectedSessionId((prev) => (prev === sessionId ? null : sessionId));

@@ -4,6 +4,8 @@ import { CompositionChart } from "@/components/dashboard/composition-chart";
 import { SpeakerChart } from "@/components/dashboard/speaker-chart";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { SpeakerGrid } from "@/components/dashboard/speaker-grid";
+import { LivePollsSummary } from "@/components/dashboard/live-polls-summary";
+import { ActionPlanSummary } from "@/components/dashboard/action-plan-summary";
 
 export default function DashboardPage() {
   return (
@@ -48,6 +50,10 @@ export default function DashboardPage() {
           </Card>
         </div>
       </main>
+
+      <LivePollsSummary />
+
+      <ActionPlanSummary />
 
       <section className="mt-8">
         <Card className="shadow-xl">

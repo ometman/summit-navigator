@@ -1,27 +1,15 @@
 import { notFound } from "next/navigation";
-import { agendaData, type Session } from "@/lib/data";
+import { agendaData } from "@/lib/data";
 import BackButton from "@/components/session/back-button";
-import SessionHeader from "@/components/session/session-header";
-import SessionStats from "@/components/session/session-stats";
-import GenericContent from "@/components/session/content/generic";
-import Session2Content from "@/components/session/content/session-2";
-import Session3Content from "@/components/session/content/session-3";
-import Session4Content from "@/components/session/content/session-4";
-import Session5Content from "@/components/session/content/session-5";
-import Session6Content from "@/components/session/content/session-6";
-import AiSummary from "@/components/session/ai-summary";
-import { QandA } from "@/components/session/q-and-a";
+import { SessionDetailClient } from "@/components/session/session-detail-client";
 
-const contentComponents: { [key: number]: React.FC<{ session: Session }> } = {
-  2: Session2Content,
-  3: Session3Content,
-  4: Session4Content,
-  5: Session5Content,
-  6: Session6Content,
-};
-
-export default function SessionPage({ params }: { params: { id: string } }) {
-  const session = agendaData.find((s) => s.id === parseInt(params.id, 10));
+export default async function SessionPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const session = agendaData.find((s) => s.id === parseInt(id, 10));
 
   if (!session) {
     notFound();
@@ -30,32 +18,12 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const colors = ['#375EAB', '#50E3C2', '#F5A623', '#FF6B6B', '#8338EC', '#3A86FF'];
   const borderColor = colors[(session.id - 1) % colors.length];
 
-  const ContentComponent = contentComponents[session.id] || GenericContent;
-
   return (
     <>
       <div className="mb-6">
         <BackButton />
       </div>
-      <div
-        className="bg-white rounded-xl shadow-2xl p-6 md:p-10 border-l-8 mb-12"
-        style={{ borderColor: borderColor }}
-      >
-        <SessionHeader session={session} />
-        <hr className="mb-6 mt-4" />
-        <SessionStats session={session} />
-        
-        <AiSummary 
-          speaker={session.speaker}
-          topic={session.title}
-          intendedAudience={session.summary} 
-        />
-
-        <QandA sessionId={session.id.toString()} />
-
-        <h3 className="text-2xl font-bold text-gray-800 mb-4 mt-8 border-b pb-2">Session Overview</h3>
-        <ContentComponent session={session} />
-      </div>
+      <SessionDetailClient baseSession={session} borderColor={borderColor} />
     </>
   );
 }

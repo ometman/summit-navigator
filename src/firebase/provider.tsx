@@ -1,60 +1,72 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, {
+  DependencyList,
+  createContext,
+  useCallback,
+  useContext,
+  ReactNode,
+  useMemo,
+  useState,
+  useEffect,
+} from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { Auth, User, onAuthStateChanged, signOut } from 'firebase/auth';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 interface FirebaseProviderProps {
   children: ReactNode;
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null;
 }
 
-// Internal state for user authentication
 interface UserAuthState {
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
 
-// Combined state for the Firebase context
 export interface FirebaseContextState {
-  areServicesAvailable: boolean; // True if core services (app, firestore, auth instance) are provided
+  areServicesAvailable: boolean;
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
-  auth: Auth | null; // The Auth service instance
-  // User authentication state
+  auth: Auth | null;
   user: User | null;
-  isUserLoading: boolean; // True during initial auth check
-  userError: Error | null; // Error from auth listener
+  isUserLoading: boolean;
+  userError: Error | null;
+  isMfaVerified: boolean;
+  isMfaLoading: boolean;
+  setMfaVerified: (verified: boolean) => void;
+  refreshMfaStatus: (uid?: string) => Promise<boolean>;
 }
 
-// Return type for useFirebase()
 export interface FirebaseServicesAndUser {
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null;
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
+  isMfaVerified: boolean;
+  isMfaLoading: boolean;
+  setMfaVerified: (verified: boolean) => void;
+  refreshMfaStatus: (uid?: string) => Promise<boolean>;
 }
 
-// Return type for useUser() - specific to user auth state
-export interface UserHookResult { // Renamed from UserAuthHookResult for consistency if desired, or keep as UserAuthHookResult
+export interface UserHookResult {
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
+  isMfaVerified: boolean;
+  isMfaLoading: boolean;
+  setMfaVerified: (verified: boolean) => void;
+  refreshMfaStatus: (uid?: string) => Promise<boolean>;
 }
 
-// React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
-/**
- * FirebaseProvider manages and provides Firebase services and user authentication state.
- */
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
   firebaseApp,
@@ -63,33 +75,101 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 }) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     user: null,
-    isUserLoading: true, // Start loading until first auth event
+    isUserLoading: true,
     userError: null,
   });
+  const [isMfaVerified, setIsMfaVerified] = useState<boolean>(false);
+  const [isMfaLoading, setIsMfaLoading] = useState<boolean>(false);
 
-  // Effect to subscribe to Firebase auth state changes
+  const latestUidRef = React.useRef<string | undefined>(undefined);
+  latestUidRef.current = userAuthState.user?.uid;
+
+  const refreshMfaStatus = useCallback(
+    async (explicitUid?: string): Promise<boolean> => {
+      const targetUid = explicitUid || latestUidRef.current;
+      if (!targetUid) {
+        setIsMfaVerified(false);
+        setIsMfaLoading(false);
+        return false;
+      }
+
+      setIsMfaLoading(true);
+      try {
+        const res = await fetch(
+          `/api/auth/otp?uid=${encodeURIComponent(targetUid)}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) {
+          setIsMfaVerified(false);
+          return false;
+        }
+        const data = await res.json();
+        const verified = Boolean(data.verified);
+        setIsMfaVerified(verified);
+        return verified;
+      } catch {
+        setIsMfaVerified(false);
+        return false;
+      } finally {
+        setIsMfaLoading(false);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
-    if (!auth) { // If no Auth service instance, cannot determine user state
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
+    if (!auth) {
+      setUserAuthState({
+        user: null,
+        isUserLoading: false,
+        userError: new Error('Auth service not provided.'),
+      });
+      setIsMfaVerified(false);
+      setIsMfaLoading(false);
       return;
     }
 
-    setUserAuthState({ user: null, isUserLoading: true, userError: null }); // Reset on auth instance change
+    setUserAuthState({ user: null, isUserLoading: true, userError: null });
 
     const unsubscribe = onAuthStateChanged(
       auth,
-      (firebaseUser) => { // Auth state determined
-        setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
+      async (firebaseUser) => {
+        if (firebaseUser?.isAnonymous) {
+          // Anonymous authentication is disabled; clear any legacy anonymous session.
+          try {
+            await signOut(auth);
+          } catch {
+            // Ignore signOut error
+          }
+          setUserAuthState({ user: null, isUserLoading: false, userError: null });
+          setIsMfaVerified(false);
+          setIsMfaLoading(false);
+          return;
+        }
+
+        setUserAuthState({
+          user: firebaseUser,
+          isUserLoading: false,
+          userError: null,
+        });
+
+        if (firebaseUser) {
+          await refreshMfaStatus(firebaseUser.uid);
+        } else {
+          setIsMfaVerified(false);
+          setIsMfaLoading(false);
+        }
       },
-      (error) => { // Auth listener error
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
+      (error) => {
+        console.error('FirebaseProvider: onAuthStateChanged error:', error);
         setUserAuthState({ user: null, isUserLoading: false, userError: error });
+        setIsMfaVerified(false);
+        setIsMfaLoading(false);
       }
     );
-    return () => unsubscribe(); // Cleanup
-  }, [auth]); // Depends on the auth instance
+    return () => unsubscribe();
+  }, [auth, refreshMfaStatus]);
 
-  // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
@@ -100,8 +180,20 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
+      isMfaVerified,
+      isMfaLoading,
+      setMfaVerified: setIsMfaVerified,
+      refreshMfaStatus,
     };
-  }, [firebaseApp, firestore, auth, userAuthState]);
+  }, [
+    firebaseApp,
+    firestore,
+    auth,
+    userAuthState,
+    isMfaVerified,
+    isMfaLoading,
+    refreshMfaStatus,
+  ]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -111,19 +203,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   );
 };
 
-/**
- * Hook to access core Firebase services and user authentication state.
- * Throws error if core services are not available or used outside provider.
- */
 export const useFirebase = (): FirebaseServicesAndUser => {
   const context = useContext(FirebaseContext);
 
   if (context === undefined) {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
-  }
-
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
   }
 
   return {
@@ -133,44 +217,59 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
+    isMfaVerified: context.isMfaVerified,
+    isMfaLoading: context.isMfaLoading,
+    setMfaVerified: context.setMfaVerified,
+    refreshMfaStatus: context.refreshMfaStatus,
   };
 };
 
-/** Hook to access Firebase Auth instance. */
-export const useAuth = (): Auth => {
+export const useAuth = (): Auth | null => {
   const { auth } = useFirebase();
   return auth;
 };
 
-/** Hook to access Firestore instance. */
-export const useFirestore = (): Firestore => {
+export const useFirestore = (): Firestore | null => {
   const { firestore } = useFirebase();
   return firestore;
 };
 
-/** Hook to access Firebase App instance. */
-export const useFirebaseApp = (): FirebaseApp => {
+export const useFirebaseApp = (): FirebaseApp | null => {
   const { firebaseApp } = useFirebase();
   return firebaseApp;
 };
 
-type MemoFirebase <T> = T & {__memo?: boolean};
+type MemoFirebase<T> = T & { __memo?: boolean };
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
+export function useMemoFirebase<T>(
+  factory: () => T,
+  deps: DependencyList
+): T | MemoFirebase<T> {
   const memoized = useMemo(factory, deps);
-  
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
+
+  if (typeof memoized !== 'object' || memoized === null) return memoized;
   (memoized as MemoFirebase<T>).__memo = true;
-  
+
   return memoized;
 }
 
-/**
- * Hook specifically for accessing the authenticated user's state.
- * This provides the User object, loading status, and any auth errors.
- * @returns {UserHookResult} Object with user, isUserLoading, userError.
- */
-export const useUser = (): UserHookResult => { // Renamed from useAuthUser
-  const { user, isUserLoading, userError } = useFirebase(); // Leverages the main hook
-  return { user, isUserLoading, userError };
+export const useUser = (): UserHookResult => {
+  const {
+    user,
+    isUserLoading,
+    userError,
+    isMfaVerified,
+    isMfaLoading,
+    setMfaVerified,
+    refreshMfaStatus,
+  } = useFirebase();
+  return {
+    user,
+    isUserLoading,
+    userError,
+    isMfaVerified,
+    isMfaLoading,
+    setMfaVerified,
+    refreshMfaStatus,
+  };
 };

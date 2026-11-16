@@ -10,37 +10,42 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart"
-import { agendaData } from "@/lib/data"
-
-const totalContent = agendaData.reduce((sum, s) => sum + s.content, 0);
-const totalQa = agendaData.reduce((sum, s) => sum + s.qa, 0);
-const totalPrayer = agendaData.reduce((sum, s) => sum + s.prayer, 0);
-
-const chartData = [
-  { type: "Content & Teaching", value: totalContent, fill: "var(--color-content)" },
-  { type: "Dedicated Q&A", value: totalQa, fill: "var(--color-qa)" },
-  { type: "Prayer & Transition", value: totalPrayer, fill: "var(--color-prayer)" },
-]
-
-const chartConfig = {
-  value: {
-    label: "Minutes",
-  },
-  content: {
-    label: `Content & Teaching (${totalContent} min)`,
-    color: "hsl(var(--chart-1))",
-  },
-  qa: {
-    label: `Dedicated Q&A (${totalQa} min)`,
-    color: "hsl(var(--chart-2))",
-  },
-  prayer: {
-    label: `Prayer & Transition (${totalPrayer} min)`,
-    color: "hsl(var(--chart-3))",
-  },
-}
+import { useSummitContent } from "@/components/content/summit-content-provider"
 
 export function CompositionChart() {
+  const { sessions } = useSummitContent();
+
+  const { chartData, chartConfig } = React.useMemo(() => {
+    const totalContent = sessions.reduce((sum, s) => sum + s.content, 0);
+    const totalQa = sessions.reduce((sum, s) => sum + s.qa, 0);
+    const totalPrayer = sessions.reduce((sum, s) => sum + s.prayer, 0);
+
+    return {
+      chartData: [
+        { type: "Content & Teaching", value: totalContent, fill: "var(--color-content)" },
+        { type: "Dedicated Q&A", value: totalQa, fill: "var(--color-qa)" },
+        { type: "Prayer & Transition", value: totalPrayer, fill: "var(--color-prayer)" },
+      ],
+      chartConfig: {
+        value: {
+          label: "Minutes",
+        },
+        content: {
+          label: `Content & Teaching (${totalContent} min)`,
+          color: "hsl(var(--chart-1))",
+        },
+        qa: {
+          label: `Dedicated Q&A (${totalQa} min)`,
+          color: "hsl(var(--chart-2))",
+        },
+        prayer: {
+          label: `Prayer & Transition (${totalPrayer} min)`,
+          color: "hsl(var(--chart-3))",
+        },
+      },
+    };
+  }, [sessions]);
+
   return (
     <ChartContainer
       config={chartConfig}
